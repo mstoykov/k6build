@@ -73,11 +73,10 @@ func TestBuild(t *testing.T) {
 		t.Fatalf("setting up test builder %v", err)
 	}
 
-	registry, err := k6catalog.NewRegistryFromJSON("testdata/registry.json")
+	catalog, err := k6catalog.NewCatalogFromJSON("testdata/catalog.json")
 	if err != nil {
 		t.Fatalf("setting up test builder %v", err)
 	}
-	catalog := k6catalog.NewCatalog(registry)
 
 	testCases := []struct {
 		title        string

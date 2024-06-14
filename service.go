@@ -69,12 +69,10 @@ func NewBuildService(
 
 // DefaultLocalBuildService creates a Local Build service with default configuration
 func DefaultLocalBuildService() (BuildService, error) {
-	registry, err := k6catalog.DefaultRegistry()
+	catalog, err := k6catalog.DefaultCatalog()
 	if err != nil {
 		return nil, fmt.Errorf("creating catalog %w", err)
 	}
-
-	catalog := k6catalog.NewCatalog(registry)
 
 	builder, err := k6foundry.NewDefaultNativeBuilder()
 	if err != nil {
@@ -85,6 +83,7 @@ func DefaultLocalBuildService() (BuildService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating temp cache %w", err)
 	}
+
 	return &buildsrv{
 		catalog: catalog,
 		builder: builder,
