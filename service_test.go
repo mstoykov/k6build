@@ -91,7 +91,7 @@ func TestBuild(t *testing.T) {
 			deps:         []Dependency{},
 			expectErr:    nil,
 			expect: Artifact{
-				Dependencies: []Module{{Path: "go.k6.io/k6", Version: "v0.1.0"}},
+				Dependencies: map[string]string{"k6": "v0.1.0"},
 			},
 		},
 		{
@@ -100,7 +100,7 @@ func TestBuild(t *testing.T) {
 			deps:         []Dependency{},
 			expectErr:    nil,
 			expect: Artifact{
-				Dependencies: []Module{{Path: "go.k6.io/k6", Version: "v0.2.0"}},
+				Dependencies: map[string]string{"k6": "v0.2.0"},
 			},
 		},
 		{
@@ -115,9 +115,9 @@ func TestBuild(t *testing.T) {
 			deps:         []Dependency{{Name: "k6/x/ext", Constraints: "v0.1.0"}},
 			expectErr:    nil,
 			expect: Artifact{
-				Dependencies: []Module{
-					{Path: "go.k6.io/k6", Version: "v0.1.0"},
-					{Path: "go.k6.io/k6ext", Version: "v0.1.0"},
+				Dependencies: map[string]string{
+					"k6":       "v0.1.0",
+					"k6/x/ext": "v0.1.0",
 				},
 			},
 		},

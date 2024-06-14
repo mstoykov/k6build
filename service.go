@@ -10,6 +10,7 @@ import (
 
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
+	"golang.org/x/exp/maps"
 )
 
 const (
@@ -37,9 +38,11 @@ type Artifact struct {
 	// URL to fetch the artifact's binary
 	URL string `json:"url,omitempty"`
 	// list of dependencies
-	Dependencies []Module `json:"dependencies,omitempty"`
+	Dependencies map[string]string `json:"dependencies,omitempty"`
+	// platform
+	Platform string `json:"platform,omitempty"`
 	// binary checksum (sha256)
-	Checksum string  `json:"checksum,omitempty"`
+	Checksum string `json:"checksum,omitempty"`
 }
 
 // BuildService defines the interface of a build service
@@ -97,10 +100,13 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 		return Artifact{}, fmt.Errorf("invalid platform %w", err)
 	}
 
+	resolved := map[string]string{}
+
 	k6Mod, err := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
 	if err != nil {
 		return Artifact{}, err
 	}
+	resolved[k6Dep] = k6Mod.Version
 
 	mods := []k6foundry.Module{}
 	for _, d := range deps {
@@ -109,6 +115,7 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 			return Artifact{}, err
 		}
 		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
+		resolved[d.Name] = m.Version
 	}
 
 	artifactBuffer := &bytes.Buffer{}
@@ -122,17 +129,13 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 		return Artifact{}, fmt.Errorf("creating object  %w", err)
 	}
 
-	resolved := []Module{{Path: k6Mod.Path, Version: k6Mod.Version}}
-	for _, m := range mods {
-		resolved = append(resolved, Module{Path: m.Path, Version: m.Version})
-	}
-
-	sort.Slice(resolved, func(i, j int) bool { return resolved[i].Path < resolved[j].Path })
+	sorted := maps.Keys(resolved)
+	sort.Strings(sorted)
 
 	// generate id form sorted list of dependencies
 	hash := sha1.New()
-	for _, d := range resolved {
-		hash.Sum([]byte(fmt.Sprintf("%s:%s", d.Path, d.Version)))
+	for _, d := range sorted {
+		hash.Sum([]byte(fmt.Sprintf("%s:%s", d, resolved[d])))
 	}
 	id := fmt.Sprintf("%x", hash.Sum(nil))
 
@@ -141,5 +144,6 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 		Checksum:     artifactObject.Checksum,
 		URL:          artifactObject.URL,
 		Dependencies: resolved,
+		Platform:     platform,
 	}, nil
 }

@@ -6,6 +6,7 @@ require (
 	github.com/grafana/k6catalog v0.0.0-20240614130953-c7b8fc289822
 	github.com/grafana/k6foundry v0.0.0-20240614080942-6f519c8b21c0
 	github.com/spf13/cobra v1.8.0
+	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 )
 
 require (
