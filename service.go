@@ -4,7 +4,9 @@ package k6build
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"fmt"
+	"sort"
 
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
@@ -22,12 +24,22 @@ type Dependency struct {
 	Constraints string `json:"constraints,omitempty"`
 }
 
+// Module defines an artifact dependency
+type Module struct {
+	Path    string `json:"path,omitempty"`
+	Version string `json:"vesion,omitempty"`
+}
+
 // Artifact defines a binary that can be downloaded
 // TODO: add metadata (e.g. list of dependencies, checksum, date compiled)
 type Artifact struct {
 	ID string `json:"id,omitempty"`
 	// URL to fetch the artifact's binary
 	URL string `json:"url,omitempty"`
+	// list of dependencies
+	Dependencies []Module
+	// binary checksum (sha256)
+	Checksum string
 }
 
 // BuildService defines the interface of a build service
@@ -111,5 +123,24 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 		return Artifact{}, fmt.Errorf("creating object  %w", err)
 	}
 
-	return Artifact{ID: artifactObject.ID, URL: artifactObject.URL}, nil
+	resolved := []Module{{Path: k6Mod.Path, Version: k6Mod.Version}}
+	for _, m := range mods {
+		resolved = append(resolved, Module{Path: m.Path, Version: m.Version})
+	}
+
+	sort.Slice(resolved, func(i, j int) bool { return resolved[i].Path < resolved[j].Path })
+
+	// generate id form sorted list of dependencies
+	hash := sha1.New()
+	for _, d := range resolved {
+		hash.Sum([]byte(fmt.Sprintf("%s:%s", d.Path, d.Version)))
+	}
+	id := fmt.Sprintf("%x", hash.Sum(nil))
+
+	return Artifact{
+		ID:           id,
+		Checksum:     artifactObject.Checksum,
+		URL:          artifactObject.URL,
+		Dependencies: resolved,
+	}, nil
 }

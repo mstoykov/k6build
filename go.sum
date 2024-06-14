@@ -4,6 +4,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46t
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
+github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/grafana/k6catalog v0.0.0-20240613153129-13b6ffec5b54 h1:9UybxJp8QZ1B2vpIlnEu+OZYAAvh1k590UK0T2moHbQ=
 github.com/grafana/k6catalog v0.0.0-20240613153129-13b6ffec5b54/go.mod h1:8R9eXAh2nb69+drkj0rZ4aemso0jcwCbPP6Q3E5LqCw=
 github.com/grafana/k6foundry v0.0.0-20240613181338-727b9fc60b8a h1:P+ImgSjdl2pZD0qdGfT3eXIafTyxvbrGeSD7mcZdnrc=

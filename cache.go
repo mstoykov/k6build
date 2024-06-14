@@ -1,7 +1,9 @@
 package k6build
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +13,8 @@ import (
 // Object represents an object stored in the Cache
 // TODO: add metadata (e.g creation data, size)
 type Object struct {
-	ID string
+	ID       string
+	Checksum string
 	// an url for downloading the object's content
 	URL string
 }
@@ -58,13 +61,21 @@ func (f *fileObjectStore) Store(ctx context.Context, content io.Reader) (Object,
 		return Object{}, fmt.Errorf("creating object %w", err)
 	}
 
-	_, err = io.Copy(objectFile, content)
+	// write content to object file and copy to buffer to calculate checksum
+	// TODO: optimize memory by copying content in blocks
+	buff := bytes.Buffer{}
+	_, err = io.Copy(objectFile, io.TeeReader(content, &buff))
 	if err != nil {
 		return Object{}, fmt.Errorf("creating object %w", err)
 	}
 
+	// calculate checksum
+	checksum := sha256.New()
+	checksum.Sum(buff.Bytes())
+
 	return Object{
-		ID:  filepath.Base(objectFile.Name()),
-		URL: fmt.Sprintf("file://%s", objectFile.Name()),
+		ID:       filepath.Base(objectFile.Name()),
+		Checksum: string(fmt.Sprintf("%x", checksum.Sum(nil))),
+		URL:      fmt.Sprintf("file://%s", objectFile.Name()),
 	}, nil
 }
