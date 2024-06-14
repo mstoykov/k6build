@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/grafana/k6catalog"
@@ -57,21 +55,13 @@ func TestBuild(t *testing.T) {
 
 	goproxySrv := httptest.NewServer(proxy)
 
-	gocache := filepath.Join(t.TempDir(), "gocache")
-	_ = os.Mkdir(gocache, 0o777)
-
-	modcache := filepath.Join(t.TempDir(), "modcache")
-	_ = os.Mkdir(modcache, 0o777)
-
 	opts := k6foundry.NativeBuilderOpts{
-		CleanGoCache: true, // If not cleaned, deleting test's temp directory will fail
 		GoOpts: k6foundry.GoOpts{
 			CopyEnv:    true,
 			GoProxy:    goproxySrv.URL,
 			GoNoProxy:  "none",
 			GoPrivate:  "go.k6.io",
-			GoModCache: modcache,
-			GoCache:    gocache,
+			EphemeralCache: true,
 		},
 	}
 
