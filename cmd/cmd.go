@@ -30,7 +30,7 @@ func New() *cobra.Command {
 		k6Constrains string
 		platform     string
 		registry     string
-		opts         k6foundry.NativeBuilderOpts
+		verbose      bool
 	)
 
 	cmd := &cobra.Command{
@@ -47,8 +47,16 @@ func New() *cobra.Command {
 				return fmt.Errorf("loading catalog %w", err)
 			}
 
+			opts := k6foundry.NativeBuilderOpts{}
 			// This is required to pass environment variables like the github access credential
 			opts.CopyEnv = true
+
+			if verbose {
+				opts.Verbose = true
+				opts.Stdout = os.Stdout
+				opts.Stderr = os.Stderr
+				opts.LogLevel = "DEBUG"
+			}
 			builder, err := k6foundry.NewNativeBuilder(context.TODO(), opts)
 			if err != nil {
 				return fmt.Errorf("setting up builder %w", err)
@@ -88,7 +96,7 @@ func New() *cobra.Command {
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
 	cmd.MarkFlagRequired("platform")
 	cmd.Flags().StringVarP(&registry, "catalog", "c", "catalog.json", "dependencies catalog")
-	cmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "print build output")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
 
 	return cmd
 }
