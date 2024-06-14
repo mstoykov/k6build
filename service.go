@@ -37,9 +37,9 @@ type Artifact struct {
 	// URL to fetch the artifact's binary
 	URL string `json:"url,omitempty"`
 	// list of dependencies
-	Dependencies []Module
+	Dependencies []Module `json:"dependencies,omitempty"`
 	// binary checksum (sha256)
-	Checksum string
+	Checksum string  `json:"checksum,omitempty"`
 }
 
 // BuildService defines the interface of a build service

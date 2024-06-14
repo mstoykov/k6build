@@ -40,6 +40,7 @@ k6build  -c catalog.json  -p linux/amd64 -k v0.50.0 \
       "vesion": "v0.50.0"
     }
   ],
+  "Platform": "linux/amd64",
   "Checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 }
 ```
