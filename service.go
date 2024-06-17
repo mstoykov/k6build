@@ -11,7 +11,6 @@ import (
 
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
-	"golang.org/x/exp/maps"
 )
 
 const (
@@ -107,6 +106,8 @@ func (b *buildsrv) Build(
 		return Artifact{}, fmt.Errorf("invalid platform %w", err)
 	}
 
+	// sort dependencies to ensure idempotence of build
+	sort.Slice(deps, func(i, j int) bool { return deps[i].Name < deps[j].Name })
 	resolved := map[string]string{}
 
 	k6Mod, err := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
@@ -125,16 +126,14 @@ func (b *buildsrv) Build(
 		resolved[d.Name] = m.Version
 	}
 
-	sorted := maps.Keys(resolved)
-	sort.Strings(sorted)
-
 	// generate id form sorted list of dependencies
-	hash := sha1.New() //nolint:gosec
-	hash.Sum([]byte(platform))
-	for _, d := range sorted {
-		hash.Sum([]byte(fmt.Sprintf("%s:%s", d, resolved[d])))
+	hashData := bytes.Buffer{}
+	hashData.WriteString(platform)
+	hashData.WriteString(fmt.Sprintf(":k6%s", k6Mod.Version))
+	for _, d := range deps {
+		hashData.WriteString(fmt.Sprintf(":%s%s", d, resolved[d.Name]))
 	}
-	id := fmt.Sprintf("%x", hash.Sum(nil))
+	id := fmt.Sprintf("%x", sha1.Sum(hashData.Bytes())) //nolint:gosec
 
 	artifactObject, err := b.cache.Get(ctx, id)
 	if err == nil {
