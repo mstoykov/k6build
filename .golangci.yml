@@ -60,8 +60,6 @@ linters-settings:
   forbidigo:
     forbid:
       - '^(fmt\\.Print(|f|ln)|print|println)$'
-      # Forbid everything in os, except os.Signal and os.SyscalError
-      - '^os\.(.*)$(# Using anything except Signal and SyscallError from the os package is forbidden )?'
       # Forbid everything in syscall except the uppercase constants
       - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
       - '^logrus\.Logger$'

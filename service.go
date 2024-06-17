@@ -4,7 +4,7 @@ package k6build
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec
 	"errors"
 	"fmt"
 	"sort"
@@ -59,6 +59,7 @@ type buildsrv struct {
 	cache   Cache
 }
 
+// NewBuildService creates a build service
 func NewBuildService(
 	catalog k6catalog.Catalog,
 	builder k6foundry.Builder,
@@ -95,7 +96,12 @@ func DefaultLocalBuildService() (BuildService, error) {
 	}, nil
 }
 
-func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains string, deps []Dependency) (Artifact, error) {
+func (b *buildsrv) Build(
+	ctx context.Context,
+	platform string,
+	k6Constrains string,
+	deps []Dependency,
+) (Artifact, error) {
 	buildPlatform, err := k6foundry.ParsePlatform(platform)
 	if err != nil {
 		return Artifact{}, fmt.Errorf("invalid platform %w", err)
@@ -111,9 +117,9 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 
 	mods := []k6foundry.Module{}
 	for _, d := range deps {
-		m, err := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
-		if err != nil {
-			return Artifact{}, err
+		m, modErr := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
+		if modErr != nil {
+			return Artifact{}, modErr
 		}
 		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
 		resolved[d.Name] = m.Version
@@ -123,7 +129,7 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 	sort.Strings(sorted)
 
 	// generate id form sorted list of dependencies
-	hash := sha1.New()
+	hash := sha1.New() //nolint:gosec
 	hash.Sum([]byte(platform))
 	for _, d := range sorted {
 		hash.Sum([]byte(fmt.Sprintf("%s:%s", d, resolved[d])))

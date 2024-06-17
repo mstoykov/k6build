@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	ErrObjectNotFound    = errors.New("object not found")
-	ErrAccessingObject   = errors.New("accessing object")
-	ErrCreatingObject    = errors.New("creating object")
-	ErrInitializingCache = errors.New("initializing cache")
+	ErrObjectNotFound    = errors.New("object not found")   //nolint:revive
+	ErrAccessingObject   = errors.New("accessing object")   //nolint:revive
+	ErrCreatingObject    = errors.New("creating object")    //nolint:revive
+	ErrInitializingCache = errors.New("initializing cache") //nolint:revive
 )
 
 // Object represents an object stored in the Cache
@@ -40,13 +40,14 @@ type fileObjectStore struct {
 	path string
 }
 
+// NewTempFileCache creates a file cache using a temporary file
 func NewTempFileCache() (Cache, error) {
 	return NewFileCache(filepath.Join(os.TempDir(), "buildcache"))
 }
 
 // NewFileCache creates an cached backed by a directory
 func NewFileCache(path string) (Cache, error) {
-	err := os.MkdirAll(path, 0o777)
+	err := os.MkdirAll(path, 0o750)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInitializingCache, err)
 	}
@@ -56,15 +57,16 @@ func NewFileCache(path string) (Cache, error) {
 	}, nil
 }
 
-func (f *fileObjectStore) Store(ctx context.Context, id string, content io.Reader) (Object, error) {
+// Store stores the object and returns the metadata
+func (f *fileObjectStore) Store(_ context.Context, id string, content io.Reader) (Object, error) {
 	objectDir := filepath.Join(f.path, id)
 	// TODO: check permissions
-	err := os.MkdirAll(objectDir, 0o777)
+	err := os.MkdirAll(objectDir, 0o750)
 	if err != nil {
 		return Object{}, fmt.Errorf("%w: %w", ErrCreatingObject, err)
 	}
 
-	objectFile, err := os.Create(filepath.Join(objectDir, "data"))
+	objectFile, err := os.Create(filepath.Join(objectDir, "data")) //nolint:gosec
 	if err != nil {
 		return Object{}, fmt.Errorf("%w: %w", ErrCreatingObject, err)
 	}
@@ -83,7 +85,7 @@ func (f *fileObjectStore) Store(ctx context.Context, id string, content io.Reade
 	checksum := fmt.Sprintf("%x", checksumHash.Sum(nil))
 
 	// write metadata
-	err = os.WriteFile(filepath.Join(objectDir, "checksum"), []byte(checksum), 0o644)
+	err = os.WriteFile(filepath.Join(objectDir, "checksum"), []byte(checksum), 0o644) //nolint:gosec
 	if err != nil {
 		return Object{}, fmt.Errorf("%w: %w", ErrCreatingObject, err)
 	}
@@ -95,7 +97,8 @@ func (f *fileObjectStore) Store(ctx context.Context, id string, content io.Reade
 	}, nil
 }
 
-func (f *fileObjectStore) Get(ctx context.Context, id string) (Object, error) {
+// Get retrieves an objects if exists in the cache or an error otherwise
+func (f *fileObjectStore) Get(_ context.Context, id string) (Object, error) {
 	objectDir := filepath.Join(f.path, id)
 	_, err := os.Stat(objectDir)
 
@@ -107,7 +110,7 @@ func (f *fileObjectStore) Get(ctx context.Context, id string) (Object, error) {
 		return Object{}, fmt.Errorf("%w: %w", ErrAccessingObject, err)
 	}
 
-	checksum, err := os.ReadFile(filepath.Join(objectDir, "checksum"))
+	checksum, err := os.ReadFile(filepath.Join(objectDir, "checksum")) //nolint:gosec
 	if err != nil {
 		return Object{}, fmt.Errorf("%w: %w", ErrAccessingObject, err)
 	}

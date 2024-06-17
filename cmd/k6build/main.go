@@ -8,7 +8,6 @@ import (
 	"github.com/grafana/k6build/cmd"
 )
 
-//nolint:all
 func main() {
 	root := cmd.New()
 

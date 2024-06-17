@@ -15,6 +15,8 @@ import (
 )
 
 func TestBuild(t *testing.T) {
+	t.Parallel()
+
 	modules := []struct {
 		path    string
 		version string

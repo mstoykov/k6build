@@ -78,14 +78,17 @@ func New() *cobra.Command {
 				buildDeps = append(buildDeps, k6build.Dependency{Name: name, Constraints: constrains})
 			}
 
-			artifact, err := srv.Build(context.TODO(), platform, k6Constrains, buildDeps)
+			artifact, err := srv.Build(cmd.Context(), platform, k6Constrains, buildDeps)
 			if err != nil {
 				return fmt.Errorf("building %w", err)
 			}
 
 			encoder := json.NewEncoder(os.Stdout)
 			encoder.SetIndent("", "  ")
-			encoder.Encode(artifact)
+			err = encoder.Encode(artifact)
+			if err != nil {
+				return fmt.Errorf("processing object %w", err)
+			}
 
 			return nil
 		},
@@ -94,7 +97,7 @@ func New() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&deps, "dependency", "d", nil, "list of dependencies in form package:constrains")
 	cmd.Flags().StringVarP(&k6Constrains, "k6-constrains", "k", "*", "k6 version constrains")
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
-	cmd.MarkFlagRequired("platform")
+	_ = cmd.MarkFlagRequired("platform")
 	cmd.Flags().StringVarP(&registry, "catalog", "c", "catalog.json", "dependencies catalog")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
 
