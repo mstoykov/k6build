@@ -22,7 +22,7 @@ type Object struct {
 // Cache defines an interface for storing blobs
 type Cache interface {
 	// Store stores the object and returns the metadata
-	Store(ctx context.Context, content io.Reader) (Object, error)
+	Store(ctx context.Context, id string, content io.Reader) (Object, error)
 }
 
 // an ObjectStore backed by a file
@@ -55,8 +55,8 @@ func NewFileCache(path string) (Cache, error) {
 	}, nil
 }
 
-func (f *fileObjectStore) Store(ctx context.Context, content io.Reader) (Object, error) {
-	objectFile, err := os.CreateTemp(f.path, "*")
+func (f *fileObjectStore) Store(ctx context.Context, id string, content io.Reader) (Object, error) {
+	objectFile, err := os.Create(filepath.Join(f.path, id))
 	if err != nil {
 		return Object{}, fmt.Errorf("creating object %w", err)
 	}
@@ -74,7 +74,7 @@ func (f *fileObjectStore) Store(ctx context.Context, content io.Reader) (Object,
 	checksum.Sum(buff.Bytes())
 
 	return Object{
-		ID:       filepath.Base(objectFile.Name()),
+		ID:       id,
 		Checksum: string(fmt.Sprintf("%x", checksum.Sum(nil))),
 		URL:      fmt.Sprintf("file://%s", objectFile.Name()),
 	}, nil

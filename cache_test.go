@@ -36,7 +36,7 @@ func TestFileCache(t *testing.T) {
 				t.Fatalf("test setup %v", err)
 			}
 
-			obj, err := cache.Store(context.TODO(), bytes.NewBuffer(tc.content))
+			obj, err := cache.Store(context.TODO(), "object", bytes.NewBuffer(tc.content))
 			if !errors.Is(err, tc.expectErr) {
 				t.Fatalf("expected %v got %v", tc, err)
 			}

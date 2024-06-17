@@ -118,17 +118,6 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 		resolved[d.Name] = m.Version
 	}
 
-	artifactBuffer := &bytes.Buffer{}
-	err = b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
-	if err != nil {
-		return Artifact{}, fmt.Errorf("building artifact  %w", err)
-	}
-
-	artifactObject, err := b.cache.Store(ctx, artifactBuffer)
-	if err != nil {
-		return Artifact{}, fmt.Errorf("creating object  %w", err)
-	}
-
 	sorted := maps.Keys(resolved)
 	sort.Strings(sorted)
 
@@ -139,6 +128,17 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 		hash.Sum([]byte(fmt.Sprintf("%s:%s", d, resolved[d])))
 	}
 	id := fmt.Sprintf("%x", hash.Sum(nil))
+
+	artifactBuffer := &bytes.Buffer{}
+	err = b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("building artifact  %w", err)
+	}
+
+	artifactObject, err := b.cache.Store(ctx, id, artifactBuffer)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("creating object  %w", err)
+	}
 
 	return Artifact{
 		ID:           id,
