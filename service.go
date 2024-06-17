@@ -134,6 +134,7 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 
 	// generate id form sorted list of dependencies
 	hash := sha1.New()
+	hash.Sum([]byte(platform))
 	for _, d := range sorted {
 		hash.Sum([]byte(fmt.Sprintf("%s:%s", d, resolved[d])))
 	}
