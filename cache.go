@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -59,6 +60,14 @@ func NewFileCache(path string) (Cache, error) {
 
 // Store stores the object and returns the metadata
 func (f *fileCache) Store(_ context.Context, id string, content io.Reader) (Object, error) {
+	if id == "" {
+		return Object{}, fmt.Errorf("%w id cannot be empty", ErrCreatingObject)
+	}
+
+	if strings.Contains(id, "/") {
+		return Object{}, fmt.Errorf("%w id cannot contain '/'", ErrCreatingObject)
+	}
+
 	objectDir := filepath.Join(f.path, id)
 	// TODO: check permissions
 	err := os.MkdirAll(objectDir, 0o750)
