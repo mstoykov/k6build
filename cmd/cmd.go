@@ -49,12 +49,10 @@ func New() *cobra.Command {
 
 			opts := k6foundry.NativeBuilderOpts{}
 			// This is required to pass environment variables like the github access credential
-			opts.CopyEnv = true
+			opts.CopyGoEnv = true
 
 			if verbose {
 				opts.Verbose = true
-				opts.Stdout = os.Stdout
-				opts.Stderr = os.Stderr
 				opts.LogLevel = "DEBUG"
 			}
 			builder, err := k6foundry.NewNativeBuilder(context.TODO(), opts)

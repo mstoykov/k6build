@@ -63,10 +63,11 @@ func setupBuildService(cacheDir string) (BuildService, error) {
 
 	opts := k6foundry.NativeBuilderOpts{
 		GoOpts: k6foundry.GoOpts{
-			CopyEnv:        true,
+			CopyGoEnv:      true,
 			GoProxy:        goproxySrv.URL,
 			GoNoProxy:      "none",
 			GoPrivate:      "go.k6.io",
+			GoNoSumDB:      "go.k6.io",
 			EphemeralCache: true,
 		},
 	}
