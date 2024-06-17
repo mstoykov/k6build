@@ -2,7 +2,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6catalog"
-	"github.com/grafana/k6foundry"
 	"github.com/spf13/cobra"
 )
 
@@ -21,51 +18,51 @@ const (
 	long = `
 k6 build service returns artifacts that satisfies certain dependencies
 `
+
+	example = `
+# build k6 v0.50.0 with latest version of k6/x/kubernetes
+k6build -k v0.50.0 -d k6/x/kubernetes
+
+# build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
+k6foundry build -k v0.51.0 \
+    -d k6/x/kubernetes:v0.8.0 \
+    -d k6/x/output-kafka:v0.7.0
+
+# build latest version of k6 with a version of k6/x/kubernetes greater than v0.8.0
+k6build -k v0.50.0 -d 'k6/x/kubernetes:>v0.8.0'
+
+# build k6 v0.50.0 with latest version of k6/x/kubernetes using a custom catalog
+k6build -k v0.50.0 -d k6/x/kubernetes \
+    -c /path/to/catalog.json
+
+# build k6 v0.50.0 using a custom GOPROXY
+k6build -k v0.50.0 -e GOPROXY=http://localhost:80
+`
 )
 
 // New creates new cobra command for resolve command.
 func New() *cobra.Command {
 	var (
-		deps         []string
-		k6Constrains string
-		platform     string
-		registry     string
-		verbose      bool
+		deps     []string
+		k6       string
+		platform string
+		config   k6build.LocalBuildServiceConfig
 	)
 
 	cmd := &cobra.Command{
-		Use:   "k6build",
-		Short: "k6 build service",
-		Long:  long,
+		Use:     "k6build",
+		Short:   "k6 build service",
+		Long:    long,
+		Example: example,
 		// prevent the usage help to printed to stderr when an error is reported by a subcommand
 		SilenceUsage: true,
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			catalog, err := k6catalog.NewCatalogFromJSON(registry)
+			srv, err := k6build.NewLocalBuildService(cmd.Context(), config)
 			if err != nil {
-				return fmt.Errorf("loading catalog %w", err)
+				return fmt.Errorf("configuring the build service %w", err)
 			}
-
-			opts := k6foundry.NativeBuilderOpts{}
-			// This is required to pass environment variables like the github access credential
-			opts.CopyGoEnv = true
-
-			if verbose {
-				opts.Verbose = true
-				opts.LogLevel = "DEBUG"
-			}
-			builder, err := k6foundry.NewNativeBuilder(context.TODO(), opts)
-			if err != nil {
-				return fmt.Errorf("setting up builder %w", err)
-			}
-
-			cache, err := k6build.NewTempFileCache()
-			if err != nil {
-				return fmt.Errorf("creating build cache %w", err)
-			}
-
-			srv := k6build.NewBuildService(catalog, builder, cache)
 
 			buildDeps := []k6build.Dependency{}
 			for _, d := range deps {
@@ -76,7 +73,7 @@ func New() *cobra.Command {
 				buildDeps = append(buildDeps, k6build.Dependency{Name: name, Constraints: constrains})
 			}
 
-			artifact, err := srv.Build(cmd.Context(), platform, k6Constrains, buildDeps)
+			artifact, err := srv.Build(cmd.Context(), platform, k6, buildDeps)
 			if err != nil {
 				return fmt.Errorf("building %w", err)
 			}
@@ -93,11 +90,14 @@ func New() *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVarP(&deps, "dependency", "d", nil, "list of dependencies in form package:constrains")
-	cmd.Flags().StringVarP(&k6Constrains, "k6-constrains", "k", "*", "k6 version constrains")
+	cmd.Flags().StringVarP(&k6, "k6", "k", "*", "k6 version constrains")
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
 	_ = cmd.MarkFlagRequired("platform")
-	cmd.Flags().StringVarP(&registry, "catalog", "c", "catalog.json", "dependencies catalog")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
+	cmd.Flags().StringVarP(&config.Catalog, "catalog", "c", "catalog.json", "dependencies catalog")
+	cmd.Flags().StringVarP(&config.CacheDir, "cache-dir", "f", "/tmp/buildservice", "cache dir")
+	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
+	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
+	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")
 
 	return cmd
 }

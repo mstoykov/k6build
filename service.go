@@ -71,6 +71,52 @@ func NewBuildService(
 	}
 }
 
+// LocalBuildServiceConfig defines the configuration for a Local build service
+type LocalBuildServiceConfig struct {
+	// Set build environment variables
+	// Can be used for setting (or overriding, if CopyGoEnv is true) go environment variables
+	BuildEnv map[string]string
+	// path to catalog's json file
+	Catalog string
+	// path to cache dir
+	CacheDir string
+	// Copy go environment. BuildEnv can override the variables copied from go environment.
+	CopyGoEnv bool
+	// ser verbose build mode
+	Verbose bool
+}
+
+// NewLocalBuildService creates a local build service using the given configuration
+func NewLocalBuildService(ctx context.Context, config LocalBuildServiceConfig) (BuildService, error) {
+	catalog, err := k6catalog.NewCatalogFromJSON(config.Catalog)
+	if err != nil {
+		return nil, fmt.Errorf("creating catalog %w", err)
+	}
+
+	builderOpts := k6foundry.NativeBuilderOpts{
+		Verbose: config.Verbose,
+		GoOpts: k6foundry.GoOpts{
+			Env:       config.BuildEnv,
+			CopyGoEnv: config.CopyGoEnv,
+		},
+	}
+	builder, err := k6foundry.NewNativeBuilder(ctx, builderOpts)
+	if err != nil {
+		return nil, fmt.Errorf("creating builder %w", err)
+	}
+
+	cache, err := NewFileCache(config.CacheDir)
+	if err != nil {
+		return nil, fmt.Errorf("creating cache %w", err)
+	}
+
+	return &buildsrv{
+		catalog: catalog,
+		builder: builder,
+		cache:   cache,
+	}, nil
+}
+
 // DefaultLocalBuildService creates a Local Build service with default configuration
 func DefaultLocalBuildService() (BuildService, error) {
 	catalog, err := k6catalog.DefaultCatalog()
