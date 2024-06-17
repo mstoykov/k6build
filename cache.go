@@ -35,8 +35,8 @@ type Cache interface {
 	Store(ctx context.Context, id string, content io.Reader) (Object, error)
 }
 
-// an ObjectStore backed by a file
-type fileObjectStore struct {
+// a Cache backed by a file system
+type fileCache struct {
 	path string
 }
 
@@ -52,13 +52,13 @@ func NewFileCache(path string) (Cache, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInitializingCache, err)
 	}
 
-	return &fileObjectStore{
+	return &fileCache{
 		path: path,
 	}, nil
 }
 
 // Store stores the object and returns the metadata
-func (f *fileObjectStore) Store(_ context.Context, id string, content io.Reader) (Object, error) {
+func (f *fileCache) Store(_ context.Context, id string, content io.Reader) (Object, error) {
 	objectDir := filepath.Join(f.path, id)
 	// TODO: check permissions
 	err := os.MkdirAll(objectDir, 0o750)
@@ -98,7 +98,7 @@ func (f *fileObjectStore) Store(_ context.Context, id string, content io.Reader)
 }
 
 // Get retrieves an objects if exists in the cache or an error otherwise
-func (f *fileObjectStore) Get(_ context.Context, id string) (Object, error) {
+func (f *fileCache) Get(_ context.Context, id string) (Object, error) {
 	objectDir := filepath.Join(f.path, id)
 	_, err := os.Stat(objectDir)
 
