@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -129,13 +130,28 @@ func (b *buildsrv) Build(ctx context.Context, platform string, k6Constrains stri
 	}
 	id := fmt.Sprintf("%x", hash.Sum(nil))
 
+	artifactObject, err := b.cache.Get(ctx, id)
+	if err == nil {
+		return Artifact{
+			ID:           id,
+			Checksum:     artifactObject.Checksum,
+			URL:          artifactObject.URL,
+			Dependencies: resolved,
+			Platform:     platform,
+		}, nil
+	}
+
+	if !errors.Is(err, ErrObjectNotFound) {
+		return Artifact{}, fmt.Errorf("accessing artifact %w", err)
+	}
+
 	artifactBuffer := &bytes.Buffer{}
 	err = b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
 	if err != nil {
 		return Artifact{}, fmt.Errorf("building artifact  %w", err)
 	}
 
-	artifactObject, err := b.cache.Store(ctx, id, artifactBuffer)
+	artifactObject, err = b.cache.Store(ctx, id, artifactBuffer)
 	if err != nil {
 		return Artifact{}, fmt.Errorf("creating object  %w", err)
 	}
