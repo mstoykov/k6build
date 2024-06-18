@@ -9,13 +9,37 @@ k6 build service returns artifacts that satisfies certain dependencies
 Usage:
   k6build [flags]
 
+Examples:
+
+# build k6 v0.50.0 with latest version of k6/x/kubernetes
+k6build -k v0.50.0 -d k6/x/kubernetes
+
+# build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
+k6foundry build -k v0.51.0 \
+    -d k6/x/kubernetes:v0.8.0 \
+    -d k6/x/output-kafka:v0.7.0
+
+# build latest version of k6 with a version of k6/x/kubernetes greater than v0.8.0
+k6build -k v0.50.0 -d 'k6/x/kubernetes:>v0.8.0'
+
+# build k6 v0.50.0 with latest version of k6/x/kubernetes using a custom catalog
+k6build -k v0.50.0 -d k6/x/kubernetes \
+    -c /path/to/catalog.json
+
+# build k6 v0.50.0 using a custom GOPROXY
+k6build -k v0.50.0 -e GOPROXY=http://localhost:80
+
+
 Flags:
-  -c, --catalog string           dependencies catalog (default "catalog.json")
-  -d, --dependency stringArray   list of dependencies in form package:constrains
+  -f, --cache-dir                cache dir (default "/tmp/buildservice")
+  -c, --catalog                  dependencies catalog (default "catalog.json")
+  -g, --copy-go-env              copy go environment (default true)
+  -d, --dependency               list of dependencies in form package:constrains
+  -e, --env                      build environment variables
   -h, --help                     help for k6build
-  -k, --k6-constrains string     k6 version constrains (default "*")
-  -p, --platform string          target platform
-  -v, --verbose                  print build output
+  -k, --k6                       k6 version constrains (default "*")
+  -p, --platform                 target platform (default GOOS/GOARCH)
+  -v, --verbose                  print build process output      
 ```
 
 ### Example
