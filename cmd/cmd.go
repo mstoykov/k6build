@@ -24,7 +24,7 @@ k6 build service returns artifacts that satisfies certain dependencies
 k6build -k v0.50.0 -d k6/x/kubernetes
 
 # build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
-k6foundry build -k v0.51.0 \
+k6build -k v0.51.0 \
     -d k6/x/kubernetes:v0.8.0 \
     -d k6/x/output-kafka:v0.7.0
 
