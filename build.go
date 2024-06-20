@@ -47,7 +47,7 @@ type BuildService interface {
 }
 
 // implements the BuildService interface
-type buildsrv struct {
+type localBuildSrv struct {
 	catalog k6catalog.Catalog
 	builder k6foundry.Builder
 	cache   Cache
@@ -59,7 +59,7 @@ func NewBuildService(
 	builder k6foundry.Builder,
 	cache Cache,
 ) BuildService {
-	return &buildsrv{
+	return &localBuildSrv{
 		catalog: catalog,
 		builder: builder,
 		cache:   cache,

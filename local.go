@@ -51,14 +51,14 @@ func NewLocalBuildService(ctx context.Context, config LocalBuildServiceConfig) (
 		return nil, fmt.Errorf("creating cache %w", err)
 	}
 
-	return &buildsrv{
+	return &localBuildSrv{
 		catalog: catalog,
 		builder: builder,
 		cache:   cache,
 	}, nil
 }
 
-// DefaultLocalBuildService creates a Local Build service with default configuration
+// DefaultLocalBuildService creates a local build service with default configuration
 func DefaultLocalBuildService() (BuildService, error) {
 	catalog, err := k6catalog.DefaultCatalog()
 	if err != nil {
@@ -75,14 +75,14 @@ func DefaultLocalBuildService() (BuildService, error) {
 		return nil, fmt.Errorf("creating temp cache %w", err)
 	}
 
-	return &buildsrv{
+	return &localBuildSrv{
 		catalog: catalog,
 		builder: builder,
 		cache:   cache,
 	}, nil
 }
 
-func (b *buildsrv) Build(
+func (b *localBuildSrv) Build(
 	ctx context.Context,
 	platform string,
 	k6Constrains string,

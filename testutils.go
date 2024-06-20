@@ -1,3 +1,4 @@
+// Package k6build offers utility functions for testing
 package k6build
 
 import (
