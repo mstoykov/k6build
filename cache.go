@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 var (
+	ErrInvalidURL        = errors.New("invalid object URL") //nolint:revive
 	ErrObjectNotFound    = errors.New("object not found")   //nolint:revive
 	ErrAccessingObject   = errors.New("accessing object")   //nolint:revive
 	ErrCreatingObject    = errors.New("creating object")    //nolint:revive
@@ -34,11 +36,13 @@ type Cache interface {
 	Get(ctx context.Context, id string) (Object, error)
 	// Store stores the object and returns the metadata
 	Store(ctx context.Context, id string, content io.Reader) (Object, error)
+	// Download returns the content of the object given its url
+	Download(ctx context.Context, url string) (io.ReadCloser, error)
 }
 
 // FileCache a Cache backed by a file system
 type FileCache struct {
-	path string
+	dir string
 }
 
 // NewTempFileCache creates a file cache using a temporary file
@@ -47,14 +51,14 @@ func NewTempFileCache() (Cache, error) {
 }
 
 // NewFileCache creates an cached backed by a directory
-func NewFileCache(path string) (Cache, error) {
-	err := os.MkdirAll(path, 0o750)
+func NewFileCache(dir string) (Cache, error) {
+	err := os.MkdirAll(dir, 0o750)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInitializingCache, err)
 	}
 
 	return &FileCache{
-		path: path,
+		dir: dir,
 	}, nil
 }
 
@@ -68,7 +72,7 @@ func (f *FileCache) Store(_ context.Context, id string, content io.Reader) (Obje
 		return Object{}, fmt.Errorf("%w id cannot contain '/'", ErrCreatingObject)
 	}
 
-	objectDir := filepath.Join(f.path, id)
+	objectDir := filepath.Join(f.dir, id)
 	// TODO: check permissions
 	err := os.MkdirAll(objectDir, 0o750)
 	if err != nil {
@@ -106,7 +110,7 @@ func (f *FileCache) Store(_ context.Context, id string, content io.Reader) (Obje
 
 // Get retrieves an objects if exists in the cache or an error otherwise
 func (f *FileCache) Get(_ context.Context, id string) (Object, error) {
-	objectDir := filepath.Join(f.path, id)
+	objectDir := filepath.Join(f.dir, id)
 	_, err := os.Stat(objectDir)
 
 	if errors.Is(err, os.ErrNotExist) {
@@ -127,4 +131,44 @@ func (f *FileCache) Get(_ context.Context, id string) (Object, error) {
 		Checksum: string(checksum),
 		URL:      fmt.Sprintf("file://%s", filepath.Join(objectDir, "data")),
 	}, nil
+}
+
+// Download returns the content of the object given its url
+func (f *FileCache) Download(_ context.Context, objectURL string) (io.ReadCloser, error) {
+	url, err := url.Parse(objectURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrAccessingObject, err)
+	}
+
+	switch url.Scheme {
+	case "file":
+		// prevent malicious path
+		objectPath, err := f.sanitizePath(url.Path)
+		if err != nil {
+			return nil, err
+		}
+
+		objectFile, err := os.Open(objectPath) //nolint:gosec // path is sanitized
+		if err != nil {
+			// FIXE: is the path has invalid characters, still will return ErrNotExists
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, ErrObjectNotFound
+			}
+			return nil, fmt.Errorf("%w: %w", ErrAccessingObject, err)
+		}
+
+		return objectFile, nil
+	default:
+		return nil, fmt.Errorf("%w unsupported schema: %s", ErrInvalidURL, url.Scheme)
+	}
+}
+
+func (f *FileCache) sanitizePath(path string) (string, error) {
+	path = filepath.Clean(path)
+
+	if !filepath.IsAbs(path) || !strings.HasPrefix(path, f.dir) {
+		return "", fmt.Errorf("%w : invalid path %s", ErrInvalidURL, path)
+	}
+
+	return path, nil
 }
