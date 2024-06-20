@@ -57,7 +57,7 @@ func TestAPIServer(t *testing.T) {
 				t.Fatalf("test setup %v", err)
 			}
 
-			resp, err := http.Post(apiserver.URL, "application/json", &req) //nolint:noctx
+			resp, err := http.Post(apiserver.URL, "application/json", &req)
 			if err != nil {
 				t.Fatalf("making request %v", err)
 			}
