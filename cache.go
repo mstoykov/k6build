@@ -89,9 +89,7 @@ func (f *fileCache) Store(_ context.Context, id string, content io.Reader) (Obje
 	}
 
 	// calculate checksum
-	checksumHash := sha256.New()
-	checksumHash.Sum(buff.Bytes())
-	checksum := fmt.Sprintf("%x", checksumHash.Sum(nil))
+	checksum := fmt.Sprintf("%x", sha256.Sum256(buff.Bytes()))
 
 	// write metadata
 	err = os.WriteFile(filepath.Join(objectDir, "checksum"), []byte(checksum), 0o644) //nolint:gosec
