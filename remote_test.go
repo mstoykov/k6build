@@ -39,7 +39,7 @@ func (t testSrv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(resp.Bytes())
 }
 
-func TestRe(t *testing.T) {
+func TestRemote(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
