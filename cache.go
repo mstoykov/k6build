@@ -13,14 +13,6 @@ import (
 	"strings"
 )
 
-var (
-	ErrInvalidURL        = errors.New("invalid object URL") //nolint:revive
-	ErrObjectNotFound    = errors.New("object not found")   //nolint:revive
-	ErrAccessingObject   = errors.New("accessing object")   //nolint:revive
-	ErrCreatingObject    = errors.New("creating object")    //nolint:revive
-	ErrInitializingCache = errors.New("initializing cache") //nolint:revive
-)
-
 // Object represents an object stored in the Cache
 // TODO: add metadata (e.g creation data, size)
 type Object struct {

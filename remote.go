@@ -4,14 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-)
-
-var (
-	ErrBuildFailed   = errors.New("build failed")   //nolint:revive
-	ErrRequestFailed = errors.New("request failed") //nolint:revive
 )
 
 // RemoteBuildServiceConfig defines the configuration for accessing a remote build service
