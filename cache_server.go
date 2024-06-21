@@ -123,7 +123,7 @@ func (s *CacheServer) Download(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	w.WriteHeader(http.StatusOK)
-	w.Header().Add("Content-Type", "application/binary")
+	w.Header().Add("Content-Type", "application/octet-stream")
 	w.Header().Add("ETag", object.ID)
 	_, _ = io.Copy(w, objectContent)
 }
