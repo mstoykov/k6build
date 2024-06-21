@@ -64,7 +64,6 @@ linters-settings:
       - '^(fmt\\.Print(|f|ln)|print|println)$'
       # Forbid everything in syscall except the uppercase constants
       - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
-      - '^logrus\.Logger$'
 
 linters:
   disable-all: true

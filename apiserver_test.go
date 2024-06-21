@@ -49,7 +49,10 @@ func TestAPIServer(t *testing.T) {
 				t.Fatalf("test setup %v", err)
 			}
 
-			apiserver := httptest.NewServer(NewAPIServer(buildsrv))
+			config := APIServerConfig{
+				BuildService: buildsrv,
+			}
+			apiserver := httptest.NewServer(NewAPIServer(config))
 
 			req := bytes.Buffer{}
 			err = json.NewEncoder(&req).Encode(&tc.req)

@@ -2,7 +2,9 @@
 package k6build
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
@@ -38,6 +40,19 @@ type Artifact struct {
 	Platform string `json:"platform,omitempty"`
 	// binary checksum (sha256)
 	Checksum string `json:"checksum,omitempty"`
+}
+
+// String returns a text serialization of the Artifact
+func (a Artifact) String() string {
+	buffer := &bytes.Buffer{}
+	buffer.WriteString(fmt.Sprintf(" id: %s", a.ID))
+	buffer.WriteString(fmt.Sprintf("platform: %s", a.Platform))
+	for dep, version := range a.Dependencies {
+		buffer.WriteString(fmt.Sprintf(" %s:%q", dep, version))
+	}
+	buffer.WriteString(fmt.Sprintf(" checksum: %s", a.Checksum))
+	buffer.WriteString(fmt.Sprintf(" url: %s", a.URL))
+	return buffer.String()
 }
 
 // BuildService defines the interface of a build service

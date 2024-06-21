@@ -22,6 +22,15 @@ type Object struct {
 	URL string
 }
 
+func (o Object) String() string {
+	buffer := &bytes.Buffer{}
+	buffer.WriteString(fmt.Sprintf("id: %s", o.ID))
+	buffer.WriteString(fmt.Sprintf(" checksum: %s", o.Checksum))
+	buffer.WriteString(fmt.Sprintf("url: %s", o.URL))
+
+	return buffer.String()
+}
+
 // Cache defines an interface for storing blobs
 type Cache interface {
 	// Get retrieves an objects if exists in the cache or an error otherwise

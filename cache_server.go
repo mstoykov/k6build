@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/sirupsen/logrus"
 )
 
 // CacheServerResponse is the response to a cache server request
@@ -18,15 +20,28 @@ type CacheServerResponse struct {
 
 // CacheServer implements an http server that handles cache requests
 type CacheServer struct {
-	cache   Cache
 	baseURL string
+	cache   Cache
+	log     *logrus.Logger
+}
+
+// CacheServerConfig defines the configuration for the APIServer
+type CacheServerConfig struct {
+	BaseURL string
+	Cache   Cache
+	Log     *logrus.Logger
 }
 
 // NewCacheServer returns a CacheServer backed by a cache
-func NewCacheServer(baseURL string, cache Cache) http.Handler {
+func NewCacheServer(config CacheServerConfig) http.Handler {
+	log := config.Log
+	if log == nil {
+		log = &logrus.Logger{Out: io.Discard}
+	}
 	cacheSrv := &CacheServer{
-		baseURL: baseURL,
-		cache:   cache,
+		baseURL: config.BaseURL,
+		cache:   config.Cache,
+		log:     log,
 	}
 
 	handler := http.NewServeMux()
@@ -43,9 +58,10 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 
-	// ensure errors are reported
+	// ensure errors are reported and logged
 	defer func() {
 		if resp.Error != "" {
+			s.log.Error(resp.Error)
 			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		}
 	}()
@@ -90,9 +106,10 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 
-	// ensure errors are reported
+	// ensure errors are reported and logged
 	defer func() {
 		if resp.Error != "" {
+			s.log.Error(resp.Error)
 			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		}
 	}()
