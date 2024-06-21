@@ -190,30 +190,42 @@ func TestFileCacheRetrieval(t *testing.T) {
 
 		testCases := []struct {
 			title     string
-			url       string
+			object    Object
 			expected  []byte
 			expectErr error
 		}{
 			{
-				title:     "download existing object",
-				url:       fmt.Sprintf("file://%s/object/data", cacheDir),
+				title: "download existing object",
+				object: Object{
+					ID:  "object",
+					URL: fmt.Sprintf("file://%s/object/data", cacheDir),
+				},
 				expected:  []byte("content"),
 				expectErr: nil,
 			},
 			{
-				title:     "download non existing object",
-				url:       fmt.Sprintf("file://%s/another_object/data", cacheDir),
+				title: "download non existing object",
+				object: Object{
+					ID:  "object",
+					URL: fmt.Sprintf("file://%s/another_object/data", cacheDir),
+				},
 				expectErr: ErrObjectNotFound,
 			},
 			{
 				title: "download malformed url",
-				url:   fmt.Sprintf("file://%s/invalid&path/data", cacheDir),
+				object: Object{
+					ID:  "object",
+					URL: fmt.Sprintf("file://%s/invalid&path/data", cacheDir),
+				},
 				// FIXME: this should be an ErrInvalidURL
 				expectErr: ErrObjectNotFound,
 			},
 			{
-				title:     "download malicious url",
-				url:       fmt.Sprintf("file://%s/../../data", cacheDir),
+				title: "download malicious url",
+				object: Object{
+					ID:  "object",
+					URL: fmt.Sprintf("file://%s/../../data", cacheDir),
+				},
 				expectErr: ErrInvalidURL,
 			},
 		}
@@ -222,7 +234,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
 
-				content, err := cache.Download(context.TODO(), tc.url)
+				content, err := cache.Download(context.TODO(), tc.object)
 				if !errors.Is(err, tc.expectErr) {
 					t.Fatalf("expected %v got %v", tc.expectErr, err)
 				}

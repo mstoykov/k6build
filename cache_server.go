@@ -113,7 +113,7 @@ func (s *CacheServer) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectContent, err := s.cache.Download(context.Background(), object.URL) //nolint:contextcheck
+	objectContent, err := s.cache.Download(context.Background(), object) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

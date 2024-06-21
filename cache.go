@@ -28,8 +28,8 @@ type Cache interface {
 	Get(ctx context.Context, id string) (Object, error)
 	// Store stores the object and returns the metadata
 	Store(ctx context.Context, id string, content io.Reader) (Object, error)
-	// Download returns the content of the object given its url
-	Download(ctx context.Context, url string) (io.ReadCloser, error)
+	// Download returns the content of the object
+	Download(ctx context.Context, object Object) (io.ReadCloser, error)
 }
 
 // FileCache a Cache backed by a file system
@@ -126,8 +126,8 @@ func (f *FileCache) Get(_ context.Context, id string) (Object, error) {
 }
 
 // Download returns the content of the object given its url
-func (f *FileCache) Download(_ context.Context, objectURL string) (io.ReadCloser, error) {
-	url, err := url.Parse(objectURL)
+func (f *FileCache) Download(_ context.Context, object Object) (io.ReadCloser, error) {
+	url, err := url.Parse(object.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrAccessingObject, err)
 	}

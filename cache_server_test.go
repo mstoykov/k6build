@@ -57,8 +57,8 @@ func (f *MemoryCache) Store(_ context.Context, id string, content io.Reader) (Ob
 }
 
 // Download implements Cache.
-func (f *MemoryCache) Download(_ context.Context, objectURL string) (io.ReadCloser, error) {
-	url, err := url.Parse(objectURL)
+func (f *MemoryCache) Download(_ context.Context, object Object) (io.ReadCloser, error) {
+	url, err := url.Parse(object.URL)
 	if err != nil {
 		return nil, err
 	}
