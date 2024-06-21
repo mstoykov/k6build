@@ -57,11 +57,15 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	baseURL := s.baseURL
+	if baseURL == "" {
+		baseURL = r.Host
+	}
 	// overwrite URL with own
 	resp.Object = Object{
 		ID:       id,
 		Checksum: object.Checksum,
-		URL:      fmt.Sprintf(url.JoinPath(s.baseURL, object.ID)),
+		URL:      fmt.Sprintf(url.JoinPath(baseURL, object.ID)),
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -85,10 +89,14 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// overwrite URL with own
+	baseURL := s.baseURL
+	if baseURL == "" {
+		baseURL = r.Host
+	}
 	resp.Object = Object{
 		ID:       id,
 		Checksum: object.Checksum,
-		URL:      fmt.Sprintf(url.JoinPath(s.baseURL, object.ID)),
+		URL:      fmt.Sprintf(url.JoinPath(baseURL, object.ID)),
 	}
 
 	w.WriteHeader(http.StatusOK)
