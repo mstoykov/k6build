@@ -39,12 +39,18 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 
+	// ensure errors are reported
+	defer func() {
+		if resp.Error != "" {
+			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
+		}
+	}()
+
 	req := BuildRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = fmt.Sprintf("invalid request: %s", err.Error())
-		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		return
 	}
 
@@ -57,7 +63,6 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = fmt.Sprintf("building artifact: %s", err.Error())
-		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		return
 	}
 

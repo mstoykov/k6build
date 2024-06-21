@@ -41,9 +41,19 @@ func NewCacheServer(baseURL string, cache Cache) http.Handler {
 func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 	resp := CacheServerResponse{}
 
+	w.Header().Add("Content-Type", "application/json")
+
+	// ensure errors are reported
+	defer func() {
+		if resp.Error != "" {
+			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
+		}
+	}()
+
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
+		resp.Error = ErrInvalidRequest.Error()
 		return
 	}
 
@@ -54,6 +64,8 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
+		resp.Error = err.Error()
+
 		return
 	}
 
@@ -76,15 +88,26 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	resp := CacheServerResponse{}
 
+	w.Header().Add("Content-Type", "application/json")
+
+	// ensure errors are reported
+	defer func() {
+		if resp.Error != "" {
+			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
+		}
+	}()
+
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
+		resp.Error = ErrInvalidRequest.Error()
 		return
 	}
 
 	object, err := s.cache.Store(context.Background(), id, r.Body) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		resp.Error = err.Error()
 		return
 	}
 

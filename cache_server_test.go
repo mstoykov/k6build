@@ -127,14 +127,17 @@ func TestCacheServerGet(t *testing.T) {
 				t.Fatalf("expected %s got %s", http.StatusText(tc.status), resp.Status)
 			}
 
-			if tc.status != http.StatusOK {
-				return
-			}
-
 			cacheResponse := CacheServerResponse{}
 			err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 			if err != nil {
 				t.Fatalf("reading response content %v", err)
+			}
+
+			if tc.status != http.StatusOK {
+				if cacheResponse.Error == "" {
+					t.Fatalf("expected error message not none")
+				}
+				return
 			}
 
 			if cacheResponse.Object.ID != tc.id {
@@ -187,14 +190,17 @@ func TestCacheServerStore(t *testing.T) {
 				t.Fatalf("expected %s got %s", http.StatusText(tc.status), resp.Status)
 			}
 
-			if tc.status != http.StatusOK {
-				return
-			}
-
 			cacheResponse := CacheServerResponse{}
 			err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 			if err != nil {
 				t.Fatalf("reading response content %v", err)
+			}
+
+			if tc.status != http.StatusOK {
+				if cacheResponse.Error == "" {
+					t.Fatalf("expected error message not none")
+				}
+				return
 			}
 
 			if cacheResponse.Object.ID != tc.id {

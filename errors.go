@@ -9,6 +9,7 @@ var (
 	ErrCreatingObject    = errors.New("creating object")       //nolint:revive
 	ErrInitializingCache = errors.New("initializing cache")    //nolint:revive
 	ErrInvalidConfig     = errors.New("invalid configuration") //nolint:revive
+	ErrInvalidRequest    = errors.New("invalid request")       //nolint:revive
 	ErrInvalidResponse   = errors.New("invalid response")      //nolint:revive
 	ErrInvalidURL        = errors.New("invalid object URL")    //nolint:revive
 	ErrObjectNotFound    = errors.New("object not found")      //nolint:revive
