@@ -85,15 +85,18 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	baseURL := s.baseURL
-	if baseURL == "" {
-		baseURL = r.Host
-	}
 	// overwrite URL with own
+	downloadURL, err := url.JoinPath(s.baseURL, "download")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp.Error = err.Error()
+		return
+	}
+
 	resp.Object = Object{
 		ID:       id,
 		Checksum: object.Checksum,
-		URL:      fmt.Sprintf(url.JoinPath(baseURL, object.ID)),
+		URL:      fmt.Sprintf("%s?id=%s", downloadURL, object.ID),
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -129,14 +132,17 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// overwrite URL with own
-	baseURL := s.baseURL
-	if baseURL == "" {
-		baseURL = r.Host
+	downloadURL, err := url.JoinPath(s.baseURL, "download")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp.Error = err.Error()
+		return
 	}
+
 	resp.Object = Object{
 		ID:       id,
 		Checksum: object.Checksum,
-		URL:      fmt.Sprintf(url.JoinPath(baseURL, object.ID)),
+		URL:      fmt.Sprintf("%s?id=%s", downloadURL, object.ID),
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -100,11 +100,11 @@ func TestCacheServerGet(t *testing.T) {
 		status   int
 		epectErr string
 	}{
-		// {
-		// 	title:  "return object",
-		// 	id:     "object1",
-		// 	status: http.StatusOK,
-		// },
+		{
+			title:  "return object",
+			id:     "object1",
+			status: http.StatusOK,
+		},
 		{
 			title:  "object not found",
 			id:     "not_found",
