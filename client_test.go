@@ -86,8 +86,8 @@ func TestRemote(t *testing.T) {
 				response: tc.resp,
 			})
 
-			client, err := NewRemoteBuildService(
-				RemoteBuildServiceConfig{
+			client, err := NewBuildServiceClient(
+				BuildServiceClientConfig{
 					URL: srv.URL,
 				},
 			)

@@ -6,26 +6,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
-// RemoteBuildServiceConfig defines the configuration for accessing a remote build service
-type RemoteBuildServiceConfig struct {
+// BuildServiceClientConfig defines the configuration for accessing a remote build service
+type BuildServiceClientConfig struct {
 	URL string
 }
 
-// NewRemoteBuildService returns a new client for a remote build service
-func NewRemoteBuildService(config RemoteBuildServiceConfig) (BuildService, error) {
-	return &remoteSrv{
+// NewBuildServiceClient returns a new client for a remote build service
+func NewBuildServiceClient(config BuildServiceClientConfig) (BuildService, error) {
+	return &BuildClient{
 		srv: config.URL,
 	}, nil
 }
 
-type remoteSrv struct {
+// BuildClient defines a client of a build service
+type BuildClient struct {
 	srv string
 }
 
-func (r *remoteSrv) Build(
-	ctx context.Context,
+// Build request building an artidact to a build service
+func (r *BuildClient) Build(
+	_ context.Context,
 	platform string,
 	k6Constrains string,
 	deps []Dependency,
@@ -41,17 +44,12 @@ func (r *remoteSrv) Build(
 		return Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		r.srv,
-		marshaled,
-	)
+	url, err := url.Parse(r.srv)
 	if err != nil {
-		return Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		return Artifact{}, fmt.Errorf("invalid server %w", err)
 	}
-
-	resp, err := http.DefaultClient.Do(req)
+	url.Path = "/build/"
+	resp, err := http.Post(url.String(), "application/json", marshaled) //nolint:noctx
 	if err != nil {
 		return Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
 	}
