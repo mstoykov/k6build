@@ -7,6 +7,8 @@ import "github.com/spf13/cobra"
 func New() *cobra.Command {
 	root := &cobra.Command{}
 	root.AddCommand(NewLocal())
+	root.AddCommand(NewServer())
+	root.AddCommand(NewClient())
 
 	return root
 }
