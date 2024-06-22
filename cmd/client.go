@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -16,7 +18,14 @@ k6build client connects to a remote build server
 `
 
 	clientExamples = `
-# build k6 v0.50.0 with latest version of k6/x/kubernetes
+# build latest k6 version
+k6build client -s http://localhost:8000 
+
+# build and download k6 v0.50.0 to 'build/k6'
+k6build client -s http://localhost:8000 
+    -k v0.50.0 -d k6/x/kubernetes \
+    -o build/k6
+
 k6build client -s http://localhost:8000 -k v0.50.0 -d k6/x/kubernetes
 
 # build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
@@ -34,10 +43,11 @@ k6build client -s http://localhost:8000 \
 // NewClient creates new cobra command for build client command.
 func NewClient() *cobra.Command {
 	var (
+		config   k6build.BuildServiceClientConfig
 		deps     []string
 		k6       string
+		output   string
 		platform string
-		config   k6build.BuildServiceClientConfig
 	)
 
 	cmd := &cobra.Command{
@@ -73,7 +83,31 @@ func NewClient() *cobra.Command {
 			encoder.SetIndent("", "  ")
 			err = encoder.Encode(artifact)
 			if err != nil {
-				return fmt.Errorf("processing object %w", err)
+				return fmt.Errorf("processing response %w", err)
+			}
+
+			if output != "" {
+				resp, err := http.Get(artifact.URL) //nolint:noctx
+				if err != nil {
+					return fmt.Errorf("downloading artifact %w", err)
+				}
+
+				if resp.StatusCode != http.StatusOK {
+					return fmt.Errorf("downloading artifact %w", err)
+				}
+
+				outFile, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE, 0o755) //nolint:gosec
+				if err != nil {
+					return fmt.Errorf("opening output file %w", err)
+				}
+				defer func() {
+					_ = resp.Body.Close()
+				}()
+
+				_, err = io.Copy(outFile, resp.Body)
+				if err != nil {
+					return fmt.Errorf("copying artifact %w", err)
+				}
 			}
 
 			return nil
@@ -84,7 +118,8 @@ func NewClient() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&deps, "dependency", "d", nil, "list of dependencies in form package:constrains")
 	cmd.Flags().StringVarP(&k6, "k6", "k", "*", "k6 version constrains")
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
-	_ = cmd.MarkFlagRequired("platform")
+	cmd.Flags().StringVarP(&output, "output", "o", "", "path to download the artifact as an executable."+
+		" If not specified, the artifact is not downloaded.")
 
 	return cmd
 }
