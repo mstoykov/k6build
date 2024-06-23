@@ -24,6 +24,8 @@ issues:
        - gocognit
        - funlen
        - lll
+       - gosec
+       - noctx
    - path: js\/modules\/k6\/http\/.*_test\.go
      linters:
        # k6/http module's tests are quite complex because they often have several nested levels.
@@ -62,7 +64,6 @@ linters-settings:
       - '^(fmt\\.Print(|f|ln)|print|println)$'
       # Forbid everything in syscall except the uppercase constants
       - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
-      - '^logrus\.Logger$'
 
 linters:
   disable-all: true
