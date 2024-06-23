@@ -117,7 +117,7 @@ func TestCacheServerGet(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/get?id=%s", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/%s", srv.URL, tc.id)
 			resp, err := http.Get(url)
 			if err != nil {
 				t.Fatalf("accessing server %v", err)
@@ -181,7 +181,7 @@ func TestCacheServerStore(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/store?id=%s", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/%s", srv.URL, tc.id)
 			resp, err := http.Post(
 				url,
 				"application/octet-stream",
@@ -264,7 +264,7 @@ func TestCacheServerDownload(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/download?id=%s", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/%s/content", srv.URL, tc.id)
 			resp, err := http.Get(url)
 			if err != nil {
 				t.Fatalf("accessing server %v", err)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 
 	"github.com/sirupsen/logrus"
 )
@@ -45,9 +44,10 @@ func NewCacheServer(config CacheServerConfig) http.Handler {
 	}
 
 	handler := http.NewServeMux()
-	handler.HandleFunc("/store", cacheSrv.Store)
-	handler.HandleFunc("/get", cacheSrv.Get)
-	handler.HandleFunc("/download", cacheSrv.Download)
+	// FIXME: this should be PUT (used POST as http client doesn't have PUT method)
+	handler.HandleFunc("POST /{id}", cacheSrv.Store)
+	handler.HandleFunc("GET /{id}", cacheSrv.Get)
+	handler.HandleFunc("GET /{id}/content", cacheSrv.Download)
 
 	return handler
 }
@@ -66,7 +66,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	id := r.URL.Query().Get("id")
+	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = ErrInvalidRequest.Error()
@@ -86,17 +86,16 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// overwrite URL with own
-	downloadURL, err := url.JoinPath(s.baseURL, "download")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resp.Error = err.Error()
-		return
+	baseURL := s.baseURL
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://%s%s", r.Host, r.RequestURI)
 	}
+	downloadURL := fmt.Sprintf("%s/%s/download", baseURL, id)
 
 	resp.Object = Object{
 		ID:       id,
 		Checksum: object.Checksum,
-		URL:      fmt.Sprintf("%s?id=%s", downloadURL, object.ID),
+		URL:      downloadURL,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -117,7 +116,7 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	id := r.URL.Query().Get("id")
+	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = ErrInvalidRequest.Error()
@@ -132,17 +131,16 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// overwrite URL with own
-	downloadURL, err := url.JoinPath(s.baseURL, "download")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resp.Error = err.Error()
-		return
+	baseURL := s.baseURL
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://%s%s", r.Host, r.RequestURI)
 	}
+	downloadURL := fmt.Sprintf("%s/%s/download", baseURL, id)
 
 	resp.Object = Object{
 		ID:       id,
 		Checksum: object.Checksum,
-		URL:      fmt.Sprintf("%s?id=%s", downloadURL, object.ID),
+		URL:      downloadURL,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -151,7 +149,7 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 
 // Download returns an object's content given its id
 func (s *CacheServer) Download(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return

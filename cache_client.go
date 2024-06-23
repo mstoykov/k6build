@@ -32,7 +32,7 @@ func NewCacheClient(config CacheClientConfig) (*CacheClient, error) {
 
 // Get retrieves an objects if exists in the cache or an error otherwise
 func (c *CacheClient) Get(_ context.Context, id string) (Object, error) {
-	url := fmt.Sprintf("%s/get?id=%s", c.server, id)
+	url := fmt.Sprintf("%s/%s", c.server, id)
 
 	// TODO: use http.Request
 	resp, err := http.Get(url) //nolint:gosec,noctx
@@ -65,7 +65,7 @@ func (c *CacheClient) Get(_ context.Context, id string) (Object, error) {
 
 // Store stores the object and returns the metadata
 func (c *CacheClient) Store(_ context.Context, id string, content io.Reader) (Object, error) {
-	url := fmt.Sprintf("%s/store?id=%s", c.server, id)
+	url := fmt.Sprintf("%s/%s", c.server, id)
 	resp, err := http.Post( //nolint:gosec,noctx
 		url,
 		"application/octet-stream",

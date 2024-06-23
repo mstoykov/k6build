@@ -93,7 +93,7 @@ func NewClient() *cobra.Command {
 				}
 
 				if resp.StatusCode != http.StatusOK {
-					return fmt.Errorf("downloading artifact %w", err)
+					return fmt.Errorf("request failed with status %s", resp.Status)
 				}
 
 				outFile, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE, 0o755) //nolint:gosec
