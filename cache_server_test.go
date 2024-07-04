@@ -264,7 +264,7 @@ func TestCacheServerDownload(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/%s/content", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/%s/download", srv.URL, tc.id)
 			resp, err := http.Get(url)
 			if err != nil {
 				t.Fatalf("accessing server %v", err)

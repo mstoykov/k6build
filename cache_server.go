@@ -47,7 +47,7 @@ func NewCacheServer(config CacheServerConfig) http.Handler {
 	// FIXME: this should be PUT (used POST as http client doesn't have PUT method)
 	handler.HandleFunc("POST /{id}", cacheSrv.Store)
 	handler.HandleFunc("GET /{id}", cacheSrv.Get)
-	handler.HandleFunc("GET /{id}/content", cacheSrv.Download)
+	handler.HandleFunc("GET /{id}/download", cacheSrv.Download)
 
 	return handler
 }
