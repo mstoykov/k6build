@@ -6,6 +6,7 @@ import (
 	"crypto/sha1" //nolint:gosec
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/grafana/k6catalog"
@@ -35,12 +36,16 @@ func NewLocalBuildService(ctx context.Context, config LocalBuildServiceConfig) (
 	}
 
 	builderOpts := k6foundry.NativeBuilderOpts{
-		Verbose: config.Verbose,
 		GoOpts: k6foundry.GoOpts{
 			Env:       config.BuildEnv,
 			CopyGoEnv: config.CopyGoEnv,
 		},
 	}
+	if config.Verbose {
+		builderOpts.Stdout = os.Stdout
+		builderOpts.Stderr = os.Stderr
+	}
+
 	builder, err := k6foundry.NewNativeBuilder(ctx, builderOpts)
 	if err != nil {
 		return nil, fmt.Errorf("creating builder %w", err)
