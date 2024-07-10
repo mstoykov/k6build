@@ -3,6 +3,7 @@ module github.com/grafana/k6build
 go 1.22.2
 
 require (
+	github.com/grafana/clireadme v0.1.0
 	github.com/grafana/k6catalog v0.1.0
 	github.com/grafana/k6foundry v0.1.3
 	github.com/spf13/cobra v1.8.0
