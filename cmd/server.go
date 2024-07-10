@@ -64,12 +64,16 @@ func NewServer() *cobra.Command { //nolint:funlen
 			}
 
 			builderOpts := k6foundry.NativeBuilderOpts{
-				Verbose: verbose,
 				GoOpts: k6foundry.GoOpts{
 					Env:       buildEnv,
 					CopyGoEnv: copyGoEnv,
 				},
 			}
+			if verbose {
+				builderOpts.Stdout = os.Stdout
+				builderOpts.Stderr = os.Stderr
+			}
+
 			builder, err := k6foundry.NewNativeBuilder(cmd.Context(), builderOpts)
 			if err != nil {
 				return fmt.Errorf("creating builder %w", err)
