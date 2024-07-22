@@ -22,3 +22,6 @@ lint: format
 test:
 	go test -race  ./...
 
+.PHONY: readme
+readme:
+	go run ./tools/gendoc README.md
