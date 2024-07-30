@@ -6,9 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
-
-	"github.com/sirupsen/logrus"
 )
 
 // BuildRequest defines a request to the build service
@@ -38,13 +37,13 @@ type BuildResponse struct {
 // APIServerConfig defines the configuration for the APIServer
 type APIServerConfig struct {
 	BuildService BuildService
-	Log          *logrus.Logger
+	Log          *slog.Logger
 }
 
 // APIServer defines a k6build API server
 type APIServer struct {
 	srv BuildService
-	log *logrus.Logger
+	log *slog.Logger
 }
 
 // NewAPIServer creates a new build service API server
@@ -52,7 +51,12 @@ type APIServer struct {
 func NewAPIServer(config APIServerConfig) *APIServer {
 	log := config.Log
 	if log == nil {
-		log = &logrus.Logger{Out: io.Discard}
+		log = slog.New(
+			slog.NewTextHandler(
+				io.Discard,
+				&slog.HandlerOptions{},
+			),
+		)
 	}
 	return &APIServer{
 		srv: config.BuildService,
@@ -82,7 +86,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.log.Debugf("processing request %s", req.String())
+	a.log.Debug("processing", "request", req.String())
 
 	artifact, err := a.srv.Build( //nolint:contextcheck
 		context.Background(),
@@ -96,7 +100,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.log.Debugf("returning artifact %s", artifact.String())
+	a.log.Debug("returning", "artifact", artifact.String())
 
 	resp.Artifact = artifact
 	w.WriteHeader(http.StatusOK)
