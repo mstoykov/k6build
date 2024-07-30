@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +34,6 @@ func NewServer() *cobra.Command { //nolint:funlen
 		copyGoEnv bool
 		port      int
 		verbose   bool
-		log       *logrus.Logger
 		logLevel  string
 	)
 
@@ -48,15 +47,20 @@ func NewServer() *cobra.Command { //nolint:funlen
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ll, err := logrus.ParseLevel(logLevel)
+			// set log
+			ll, err := k6build.ParseLogLevel(logLevel)
 			if err != nil {
 				return fmt.Errorf("parsing log level %w", err)
 			}
-			log = &logrus.Logger{
-				Out:       os.Stderr,
-				Formatter: new(logrus.TextFormatter),
-				Level:     ll,
-			}
+
+			log := slog.New(
+				slog.NewTextHandler(
+					os.Stderr,
+					&slog.HandlerOptions{
+						Level: ll,
+					},
+				),
+			)
 
 			catalog, err := k6catalog.NewCatalogFromJSON(catalog)
 			if err != nil {
@@ -64,6 +68,7 @@ func NewServer() *cobra.Command { //nolint:funlen
 			}
 
 			builderOpts := k6foundry.NativeBuilderOpts{
+				Logger: log,
 				GoOpts: k6foundry.GoOpts{
 					Env:       buildEnv,
 					CopyGoEnv: copyGoEnv,
@@ -118,10 +123,10 @@ func NewServer() *cobra.Command { //nolint:funlen
 			srv.Handle("/cache/", http.StripPrefix("/cache", cacheSrv))
 
 			listerAddr := fmt.Sprintf("localhost:%d", port)
-			log.Infof("starting server at %s", listerAddr)
+			log.Info("starting server", "address", listerAddr)
 			err = http.ListenAndServe(listerAddr, srv) //nolint:gosec
 			if err != nil {
-				log.Infof("server ended with error %s", err.Error())
+				log.Info("server ended", "error", err.Error())
 			}
 			log.Info("ending server")
 

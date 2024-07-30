@@ -6,9 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
-
-	"github.com/sirupsen/logrus"
 )
 
 // CacheServerResponse is the response to a cache server request
@@ -21,21 +20,27 @@ type CacheServerResponse struct {
 type CacheServer struct {
 	baseURL string
 	cache   Cache
-	log     *logrus.Logger
+	log     *slog.Logger
 }
 
 // CacheServerConfig defines the configuration for the APIServer
 type CacheServerConfig struct {
 	BaseURL string
 	Cache   Cache
-	Log     *logrus.Logger
+	Log     *slog.Logger
 }
 
 // NewCacheServer returns a CacheServer backed by a cache
 func NewCacheServer(config CacheServerConfig) http.Handler {
 	log := config.Log
+
 	if log == nil {
-		log = &logrus.Logger{Out: io.Discard}
+		log = slog.New(
+			slog.NewTextHandler(
+				io.Discard,
+				&slog.HandlerOptions{},
+			),
+		)
 	}
 	cacheSrv := &CacheServer{
 		baseURL: config.BaseURL,
