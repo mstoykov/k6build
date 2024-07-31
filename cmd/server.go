@@ -14,7 +14,7 @@ import (
 
 const (
 	serverLong = `
-starts a k6build server that server
+starts a k6build server
 `
 
 	serverExample = `
@@ -25,7 +25,7 @@ k6build server -c /path/to/catalog.json
 k6build server -e GOPROXY=http://localhost:80`
 )
 
-// NewServer creates new cobra command for resolve command.
+// NewServer creates new cobra command for server command.
 func NewServer() *cobra.Command { //nolint:funlen
 	var (
 		buildEnv  map[string]string
