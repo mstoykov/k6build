@@ -7,9 +7,69 @@ Build k6 using one of the supported builders.
 
 ## Commands
 
+* [k6build cache](#k6build-cache)	 - k6 cache server
 * [k6build client](#k6build-client)	 - build k6 using a remote build server
 * [k6build local](#k6build-local)	 - build using a local builder
 * [k6build server](#k6build-server)	 - k6 build service
+
+---
+# k6build cache
+
+k6 cache server
+
+## Synopsis
+
+
+Starts a k6build cache server. 
+
+The cache server offers a REST API for storing and downloading objects.
+
+Objects can be retrieved by a download url returned when the object is stored.
+
+The --download-url specifies the base URL for downloading objects. This is necessary to allow
+downloading the objects from different machines.
+
+
+```
+k6build cache [flags]
+```
+
+## Examples
+
+```
+
+# start the cache server serving an external url
+k6build cache --download0url http://external.url
+
+# store object from same host
+curl -x POST http://localhost:9000/cache/objectID -d "object content" | jq .
+{
+	"Error": "",
+	"Object": {
+	  "ID": "objectID",
+	  "Checksum": "17d3eb873fe4b1aac4f9d2505aefbb5b53b9a7f34a6aadd561be104c0e9d678b",
+	  "URL": "http://external.url:9000/cache/objectID/download"
+	}
+      }
+
+# download object from another machine using the external url
+curl http://external.url:9000/cache/objectID/download
+
+```
+
+## Flags
+
+```
+  -c, --cache-dir string      cache directory (default "/tmp/cache/objectstore")
+  -d, --download-url string   base url used for downloading objects. If not specified http://localhost:<port> is used
+  -h, --help                  help for cache
+  -l, --log-level string      log level (default "INFO")
+  -p, --port int              port server will listen (default 9000)
+```
+
+## SEE ALSO
+
+* [k6build](#k6build)	 - Build k6 with various builders.
 
 ---
 # k6build client
@@ -161,7 +221,7 @@ k6 build service
 ## Synopsis
 
 
-starts a k6build server that server
+starts a k6build server
 
 
 ```
@@ -183,6 +243,7 @@ k6build server -e GOPROXY=http://localhost:80
 
 ```
   -f, --cache-dir string     cache dir (default "/tmp/buildservice")
+      --cache-url string     cache server url. If not specified, a local cache server is started
   -c, --catalog string       dependencies catalog (default "catalog.json")
   -g, --copy-go-env          copy go environment (default true)
   -e, --env stringToString   build environment variables (default [])
