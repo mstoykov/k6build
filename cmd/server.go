@@ -28,13 +28,14 @@ k6build server -e GOPROXY=http://localhost:80`
 // NewServer creates new cobra command for server command.
 func NewServer() *cobra.Command { //nolint:funlen
 	var (
-		buildEnv  map[string]string
-		cacheDir  string
-		catalog   string
-		copyGoEnv bool
-		port      int
-		verbose   bool
-		logLevel  string
+		buildEnv    map[string]string
+		cacheDir    string
+		cacheSrvURL string
+		catalog     string
+		copyGoEnv   bool
+		port        int
+		verbose     bool
+		logLevel    string
 	)
 
 	cmd := &cobra.Command{
@@ -89,14 +90,19 @@ func NewServer() *cobra.Command { //nolint:funlen
 				return fmt.Errorf("creating cache %w", err)
 			}
 
+			srv := http.NewServeMux()
+
 			// FIXME: this will not work across machines
-			cacheSrvURL := fmt.Sprintf("http://localhost:%d/cache", port)
-			config := k6build.CacheServerConfig{
-				BaseURL: cacheSrvURL,
-				Cache:   cache,
-				Log:     log,
+			if cacheSrvURL == "" {
+				cacheSrvURL = fmt.Sprintf("http://localhost:%d/cache", port)
+				config := k6build.CacheServerConfig{
+					BaseURL: cacheSrvURL,
+					Cache:   cache,
+					Log:     log,
+				}
+				cacheSrv := k6build.NewCacheServer(config)
+				srv.Handle("/cache/", http.StripPrefix("/cache", cacheSrv))
 			}
-			cacheSrv := k6build.NewCacheServer(config)
 
 			cacheClientConfig := k6build.CacheClientConfig{
 				Server: cacheSrvURL,
@@ -118,9 +124,7 @@ func NewServer() *cobra.Command { //nolint:funlen
 			}
 			buildAPI := k6build.NewAPIServer(apiConfig)
 
-			srv := http.NewServeMux()
 			srv.Handle("POST /build/", http.StripPrefix("/build", buildAPI))
-			srv.Handle("/cache/", http.StripPrefix("/cache", cacheSrv))
 
 			listerAddr := fmt.Sprintf("localhost:%d", port)
 			log.Info("starting server", "address", listerAddr)
@@ -135,6 +139,12 @@ func NewServer() *cobra.Command { //nolint:funlen
 	}
 
 	cmd.Flags().StringVarP(&catalog, "catalog", "c", "catalog.json", "dependencies catalog")
+	cmd.Flags().StringVar(
+		&cacheSrvURL,
+		"cache-url",
+		"",
+		"cache server url. If not specified, a local cache server is started",
+	)
 	cmd.Flags().StringVarP(&cacheDir, "cache-dir", "f", "/tmp/buildservice", "cache dir")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&copyGoEnv, "copy-go-env", "g", true, "copy go environment")
