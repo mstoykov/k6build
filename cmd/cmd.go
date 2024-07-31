@@ -17,6 +17,7 @@ func New() *cobra.Command {
 
 	root.AddCommand(NewLocal())
 	root.AddCommand(NewServer())
+	root.AddCommand(NewCache())
 	root.AddCommand(NewClient())
 
 	return root
