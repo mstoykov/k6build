@@ -1,7 +1,14 @@
-// Package cmd offers commands for interacting with the build service
+// Package cmd contains build cobra command factory function.
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/grafana/k6build/cmd/cache"
+	"github.com/grafana/k6build/cmd/client"
+	"github.com/grafana/k6build/cmd/local"
+	"github.com/grafana/k6build/cmd/server"
+)
 
 // New creates a new root command for k6build
 func New() *cobra.Command {
@@ -15,10 +22,10 @@ func New() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
 
-	root.AddCommand(NewLocal())
-	root.AddCommand(NewServer())
-	root.AddCommand(NewCache())
-	root.AddCommand(NewClient())
+	root.AddCommand(cache.New())
+	root.AddCommand(client.New())
+	root.AddCommand(local.New())
+	root.AddCommand(server.New())
 
 	return root
 }

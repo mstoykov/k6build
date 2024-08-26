@@ -1,4 +1,4 @@
-package k6build
+package file
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"os"
 	"testing"
+
+	"github.com/grafana/k6build/pkg/cache"
 )
 
 type object struct {
@@ -15,7 +17,7 @@ type object struct {
 	content []byte
 }
 
-func setupCache(path string, preload []object) (Cache, error) {
+func setupCache(path string, preload []object) (cache.Cache, error) {
 	cache, err := NewFileCache(path)
 	if err != nil {
 		return nil, fmt.Errorf("test setup %w", err)
@@ -31,7 +33,7 @@ func setupCache(path string, preload []object) (Cache, error) {
 	return cache, nil
 }
 
-func TestFileCahceStoreObject(t *testing.T) {
+func TestFileCacheStoreObject(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -66,19 +68,19 @@ func TestFileCahceStoreObject(t *testing.T) {
 			title:     "store empty id",
 			id:        "",
 			content:   []byte("content"),
-			expectErr: ErrCreatingObject,
+			expectErr: cache.ErrCreatingObject,
 		},
 		{
 			title:     "store invalid id (dot slash)",
 			id:        "./invalid",
 			content:   []byte("content"),
-			expectErr: ErrCreatingObject,
+			expectErr: cache.ErrCreatingObject,
 		},
 		{
 			title:     "store invalid id (trailing slash)",
 			id:        "invalid/",
 			content:   []byte("content"),
-			expectErr: ErrCreatingObject,
+			expectErr: cache.ErrCreatingObject,
 		},
 	}
 
@@ -128,7 +130,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 	}
 
 	cacheDir := t.TempDir()
-	cache, err := setupCache(cacheDir, preload)
+	fileCache, err := setupCache(cacheDir, preload)
 	if err != nil {
 		t.Fatalf("test setup: %v", err)
 	}
@@ -149,7 +151,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 			{
 				title:     "retrieve non existing object",
 				id:        "another object",
-				expectErr: ErrObjectNotFound,
+				expectErr: cache.ErrObjectNotFound,
 			},
 		}
 
@@ -157,7 +159,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
 
-				obj, err := cache.Get(context.TODO(), tc.id)
+				obj, err := fileCache.Get(context.TODO(), tc.id)
 				if !errors.Is(err, tc.expectErr) {
 					t.Fatalf("expected %v got %v", tc.expectErr, err)
 				}
@@ -190,13 +192,13 @@ func TestFileCacheRetrieval(t *testing.T) {
 
 		testCases := []struct {
 			title     string
-			object    Object
+			object    cache.Object
 			expected  []byte
 			expectErr error
 		}{
 			{
 				title: "download existing object",
-				object: Object{
+				object: cache.Object{
 					ID:  "object",
 					URL: fmt.Sprintf("file://%s/object/data", cacheDir),
 				},
@@ -205,28 +207,28 @@ func TestFileCacheRetrieval(t *testing.T) {
 			},
 			{
 				title: "download non existing object",
-				object: Object{
+				object: cache.Object{
 					ID:  "object",
 					URL: fmt.Sprintf("file://%s/another_object/data", cacheDir),
 				},
-				expectErr: ErrObjectNotFound,
+				expectErr: cache.ErrObjectNotFound,
 			},
 			{
 				title: "download malformed url",
-				object: Object{
+				object: cache.Object{
 					ID:  "object",
 					URL: fmt.Sprintf("file://%s/invalid&path/data", cacheDir),
 				},
 				// FIXME: this should be an ErrInvalidURL
-				expectErr: ErrObjectNotFound,
+				expectErr: cache.ErrObjectNotFound,
 			},
 			{
 				title: "download malicious url",
-				object: Object{
+				object: cache.Object{
 					ID:  "object",
 					URL: fmt.Sprintf("file://%s/../../data", cacheDir),
 				},
-				expectErr: ErrInvalidURL,
+				expectErr: cache.ErrInvalidURL,
 			},
 		}
 
@@ -234,7 +236,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
 
-				content, err := cache.Download(context.TODO(), tc.object)
+				content, err := fileCache.Download(context.TODO(), tc.object)
 				if !errors.Is(err, tc.expectErr) {
 					t.Fatalf("expected %v got %v", tc.expectErr, err)
 				}

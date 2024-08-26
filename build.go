@@ -4,15 +4,11 @@ package k6build
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-
-	"github.com/grafana/k6catalog"
-	"github.com/grafana/k6foundry"
 )
 
-const (
-	k6Dep = "k6"
-)
+var ErrBuildFailed = errors.New("build failed") //nolint:revive
 
 // Dependency contains the properties of a k6 dependency.
 type Dependency struct {
@@ -59,24 +55,4 @@ func (a Artifact) String() string {
 type BuildService interface {
 	// Build returns a k6 Artifact given its dependencies and version constrain
 	Build(ctx context.Context, platform string, k6Constrains string, deps []Dependency) (Artifact, error)
-}
-
-// implements the BuildService interface
-type localBuildSrv struct {
-	catalog k6catalog.Catalog
-	builder k6foundry.Builder
-	cache   Cache
-}
-
-// NewBuildService creates a build service
-func NewBuildService(
-	catalog k6catalog.Catalog,
-	builder k6foundry.Builder,
-	cache Cache,
-) BuildService {
-	return &localBuildSrv{
-		catalog: catalog,
-		builder: builder,
-		cache:   cache,
-	}
 }

@@ -1,4 +1,4 @@
-package k6build
+package server
 
 import (
 	"bytes"
@@ -12,39 +12,42 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/cache/api"
 )
 
 // MemoryCache defines the state of a memory backed cache
 type MemoryCache struct {
-	objects map[string]Object
+	objects map[string]cache.Object
 	content map[string][]byte
 }
 
 func NewMemoryCache() *MemoryCache {
 	return &MemoryCache{
-		objects: map[string]Object{},
+		objects: map[string]cache.Object{},
 		content: map[string][]byte{},
 	}
 }
 
-func (f *MemoryCache) Get(_ context.Context, id string) (Object, error) {
+func (f *MemoryCache) Get(_ context.Context, id string) (cache.Object, error) {
 	object, found := f.objects[id]
 	if !found {
-		return Object{}, ErrObjectNotFound
+		return cache.Object{}, cache.ErrObjectNotFound
 	}
 
 	return object, nil
 }
 
-func (f *MemoryCache) Store(_ context.Context, id string, content io.Reader) (Object, error) {
+func (f *MemoryCache) Store(_ context.Context, id string, content io.Reader) (cache.Object, error) {
 	buffer := bytes.Buffer{}
 	_, err := buffer.ReadFrom(content)
 	if err != nil {
-		return Object{}, ErrCreatingObject
+		return cache.Object{}, cache.ErrCreatingObject
 	}
 
 	checksum := fmt.Sprintf("%x", sha256.Sum256(buffer.Bytes()))
-	object := Object{
+	object := cache.Object{
 		ID:       id,
 		Checksum: checksum,
 		URL:      fmt.Sprintf("memory:///%s", id),
@@ -57,7 +60,7 @@ func (f *MemoryCache) Store(_ context.Context, id string, content io.Reader) (Ob
 }
 
 // Download implements Cache.
-func (f *MemoryCache) Download(_ context.Context, object Object) (io.ReadCloser, error) {
+func (f *MemoryCache) Download(_ context.Context, object cache.Object) (io.ReadCloser, error) {
 	url, err := url.Parse(object.URL)
 	if err != nil {
 		return nil, err
@@ -66,7 +69,7 @@ func (f *MemoryCache) Download(_ context.Context, object Object) (io.ReadCloser,
 	id, _ := strings.CutPrefix(url.Path, "/")
 	content, found := f.content[id]
 	if !found {
-		return nil, ErrObjectNotFound
+		return nil, cache.ErrObjectNotFound
 	}
 
 	return io.NopCloser(bytes.NewBuffer(content)), nil
@@ -130,7 +133,7 @@ func TestCacheServerGet(t *testing.T) {
 				t.Fatalf("expected %s got %s", http.StatusText(tc.status), resp.Status)
 			}
 
-			cacheResponse := CacheServerResponse{}
+			cacheResponse := api.CacheResponse{}
 			err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 			if err != nil {
 				t.Fatalf("reading response content %v", err)
@@ -198,7 +201,7 @@ func TestCacheServerStore(t *testing.T) {
 				t.Fatalf("expected %s got %s", http.StatusText(tc.status), resp.Status)
 			}
 
-			cacheResponse := CacheServerResponse{}
+			cacheResponse := api.CacheResponse{}
 			err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 			if err != nil {
 				t.Fatalf("reading response content %v", err)

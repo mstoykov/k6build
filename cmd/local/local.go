@@ -1,5 +1,5 @@
-// Package cmd contains build cobra command factory function.
-package cmd
+// Package local implements the local build command
+package local
 
 import (
 	"encoding/json"
@@ -9,17 +9,19 @@ import (
 	"strings"
 
 	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/local"
+
 	"github.com/spf13/cobra"
 )
 
 var ErrTargetPlatformUndefined = errors.New("target platform is required") //nolint:revive
 
 const (
-	localLong = `
+	long = `
 k6build local builder returns artifacts that satisfies certain dependencies
 `
 
-	localExamples = `
+	example = `
 # build k6 v0.50.0 with latest version of k6/x/kubernetes
 k6build local -k v0.50.0 -d k6/x/kubernetes
 
@@ -40,26 +42,26 @@ k6build local -k v0.50.0 -e GOPROXY=http://localhost:80
 `
 )
 
-// NewLocal creates new cobra command for local build command.
-func NewLocal() *cobra.Command {
+// New creates new cobra command for local build command.
+func New() *cobra.Command {
 	var (
 		deps     []string
 		k6       string
 		platform string
-		config   k6build.LocalBuildServiceConfig
+		config   local.BuildServiceConfig
 	)
 
 	cmd := &cobra.Command{
 		Use:     "local",
 		Short:   "build using a local builder",
-		Long:    localLong,
-		Example: localExamples,
+		Long:    long,
+		Example: example,
 		// prevent the usage help to printed to stderr when an error is reported by a subcommand
 		SilenceUsage: true,
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			srv, err := k6build.NewLocalBuildService(cmd.Context(), config)
+			srv, err := local.NewBuildService(cmd.Context(), config)
 			if err != nil {
 				return fmt.Errorf("configuring the build service %w", err)
 			}

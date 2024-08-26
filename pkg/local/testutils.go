@@ -1,18 +1,23 @@
-// Package k6build offers utility functions for testing
-package k6build
+package local
 
 import (
 	"context"
 	"fmt"
 	"net/http/httptest"
+	"testing"
 
+	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/cache/file"
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
 	"github.com/grafana/k6foundry/pkg/testutils/goproxy"
 )
 
+// DependencyComp compares two dependencies for ordering
+func DependencyComp(a, b k6catalog.Module) bool { return a.Path < b.Path }
+
 // SetupTestLocalBuildService setups a local build service for testing
-func SetupTestLocalBuildService(config LocalBuildServiceConfig) (BuildService, error) {
+func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
 	modules := []struct {
 		path    string
 		version string
@@ -74,17 +79,21 @@ func SetupTestLocalBuildService(config LocalBuildServiceConfig) (BuildService, e
 		return nil, fmt.Errorf("setting up test builder %w", err)
 	}
 
-	catalog, err := k6catalog.NewCatalogFromJSON(config.Catalog)
+	catalog, err := k6catalog.NewCatalogFromJSON("testdata/catalog.json")
 	if err != nil {
 		return nil, fmt.Errorf("setting up test builder %w", err)
 	}
 
-	cache, err := NewFileCache(config.CacheDir)
+	cache, err := file.NewFileCache(t.TempDir())
 	if err != nil {
 		return nil, fmt.Errorf("creating temp cache %w", err)
 	}
 
-	buildsrv := NewBuildService(catalog, builder, cache)
+	buildsrv := &localBuildSrv{
+		builder: builder,
+		catalog: catalog,
+		cache:   cache,
+	}
 
 	return buildsrv, nil
 }

@@ -1,4 +1,4 @@
-package k6build
+package client
 
 import (
 	"bytes"
@@ -8,18 +8,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/api"
 )
 
 type testSrv struct {
 	status   int
-	response BuildResponse
+	response api.BuildResponse
 }
 
 func (t testSrv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
 	// validate request
-	req := BuildRequest{}
+	req := api.BuildRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -45,32 +48,32 @@ func TestRemote(t *testing.T) {
 	testCases := []struct {
 		title     string
 		status    int
-		resp      BuildResponse
+		resp      api.BuildResponse
 		expectErr error
 	}{
 		{
 			title:  "normal build",
 			status: http.StatusOK,
-			resp: BuildResponse{
+			resp: api.BuildResponse{
 				Error:    "",
-				Artifact: Artifact{},
+				Artifact: k6build.Artifact{},
 			},
 		},
 		{
 			title:  "request failed",
 			status: http.StatusInternalServerError,
-			resp: BuildResponse{
+			resp: api.BuildResponse{
 				Error:    "request failed",
-				Artifact: Artifact{},
+				Artifact: k6build.Artifact{},
 			},
 			expectErr: ErrRequestFailed,
 		},
 		{
 			title:  "failed build",
 			status: http.StatusOK,
-			resp: BuildResponse{
+			resp: api.BuildResponse{
 				Error:    "failed build",
-				Artifact: Artifact{},
+				Artifact: k6build.Artifact{},
 			},
 			expectErr: ErrBuildFailed,
 		},
@@ -99,7 +102,7 @@ func TestRemote(t *testing.T) {
 				context.TODO(),
 				"linux/amd64",
 				"v0.1.0",
-				[]Dependency{{Name: "k6/x/test", Constraints: "*"}},
+				[]k6build.Dependency{{Name: "k6/x/test", Constraints: "*"}},
 			)
 
 			if !errors.Is(err, tc.expectErr) {
