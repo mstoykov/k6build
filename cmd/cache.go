@@ -95,7 +95,7 @@ func NewCache() *cobra.Command {
 			srv := http.NewServeMux()
 			srv.Handle("/cache/", http.StripPrefix("/cache", cacheSrv))
 
-			listerAddr := fmt.Sprintf("localhost:%d", port)
+			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
 			log.Info("starting server", "address", listerAddr)
 			err = http.ListenAndServe(listerAddr, srv) //nolint:gosec
 			if err != nil {

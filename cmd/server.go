@@ -126,7 +126,7 @@ func NewServer() *cobra.Command { //nolint:funlen
 
 			srv.Handle("POST /build/", http.StripPrefix("/build", buildAPI))
 
-			listerAddr := fmt.Sprintf("localhost:%d", port)
+			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
 			log.Info("starting server", "address", listerAddr)
 			err = http.ListenAndServe(listerAddr, srv) //nolint:gosec
 			if err != nil {
