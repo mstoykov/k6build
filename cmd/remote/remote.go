@@ -1,8 +1,7 @@
-// Package client implements the client command
-package client
+// Package remote implements the client command
+package remote
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,62 +16,43 @@ import (
 
 const (
 	long = `
-k6build client connects to a remote build server
+Builds custom k6 binaries using a k6build server returning the details of the
+binary artifact and optionally download it.
 `
 
 	example = `
 # build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
-k6build client -s http://localhost:8000 \
+k6build remote -s http://localhost:8000 \
     -k v0.51.0 \
-    -p linux/amd64 
+    -p linux/amd64 \
     -d k6/x/kubernetes:v0.8.0 \
     -d k6/x/output-kafka:v0.7.0
 
-{
-    "id": "62d08b13fdef171435e2c6874eaad0bb35f2f9c7",
-    "url": "http://localhost:8000/cache/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download",
-    "dependencies": {
-	"k6": "v0.51.0",
-	"k6/x/kubernetes": "v0.9.0",
-	"k6/x/output-kafka": "v0.7.0"
-    },
-    "platform": "linux/amd64",
-    "checksum": "f4af178bb2e29862c0fc7d481076c9ba4468572903480fe9d6c999fea75f3793"
-}
+id: 62d08b13fdef171435e2c6874eaad0bb35f2f9c7
+platform: linux/amd64
+k6: v0.51.0
+k6/x/kubernetes: v0.9.0
+k6/x/output-kafka": v0.7.0
+checksum: f4af178bb2e29862c0fc7d481076c9ba4468572903480fe9d6c999fea75f3793
+url: http://localhost:8000/cache/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download
 
-# build k6 v0.51 with k6/x/output-kafka v0.7.0 and download to 'build/k6'
-k6build client -s http://localhost:8000
-    -p linux/amd64 
-    -k v0.51.0 -d k6/x/output-kafka:v0.7.0
+
+# build k6 v0.51 with k6/x/output-kafka v0.7.0 and download as 'build/k6'
+k6build remote -s http://localhost:8000 \
+    -p linux/amd64  \
+    -k v0.51.0 -d k6/x/output-kafka:v0.7.0 \
     -o build/k6 -q
 
-# check binary
+# check downloaded binary
 build/k6 version
 k6 v0.51.0 (go1.22.2, linux/amd64)
 Extensions:
   github.com/grafana/xk6-output-kafka v0.7.0, xk6-kafka [output]
-
-
-
-# build latest version of k6 with a version of k6/x/kubernetes greater than v0.8.0
-k6build client -s http://localhost:8000 \
-    -p linux/amd64 \
-    -k v0.50.0 -d 'k6/x/kubernetes:>v0.8.0'
-{
-   "id": "18035a12975b262430b55988ffe053098d020034",
-   "url": "http://localhost:8000/cache/18035a12975b262430b55988ffe053098d020034/download",
-   "dependencies": {
-       "k6": "v0.50.0",
-	"k6/x/kubernetes": "v0.9.0"
-    },
-   "platform": "linux/amd64",
-   "checksum": "255e5d62852af5e4109a0ac6f5818936a91c986919d12d8437e97fb96919847b"
-}
 `
 )
 
 // New creates new cobra command for build client command.
-func New() *cobra.Command { //nolint:funlen
+func New() *cobra.Command {
 	var (
 		config   client.BuildServiceClientConfig
 		deps     []string
@@ -83,8 +63,8 @@ func New() *cobra.Command { //nolint:funlen
 	)
 
 	cmd := &cobra.Command{
-		Use:     "client",
-		Short:   "build k6 using a remote build server",
+		Use:     "remote",
+		Short:   "build a custom k6 using a remote build server",
 		Long:    long,
 		Example: example,
 		// prevent the usage help to printed to stderr when an error is reported by a subcommand
@@ -112,12 +92,7 @@ func New() *cobra.Command { //nolint:funlen
 			}
 
 			if !quiet {
-				encoder := json.NewEncoder(os.Stdout)
-				encoder.SetIndent("", "  ")
-				err = encoder.Encode(artifact)
-				if err != nil {
-					return fmt.Errorf("processing response %w", err)
-				}
+				fmt.Println(artifact.Print())
 			}
 
 			if output != "" {
@@ -152,7 +127,7 @@ func New() *cobra.Command { //nolint:funlen
 	cmd.Flags().StringArrayVarP(&deps, "dependency", "d", nil, "list of dependencies in form package:constrains")
 	cmd.Flags().StringVarP(&k6, "k6", "k", "*", "k6 version constrains")
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
-	cmd.Flags().StringVarP(&output, "output", "o", "", "path to download the artifact as an executable."+
+	cmd.Flags().StringVarP(&output, "output", "o", "", "path to download the custom binary as an executable."+
 		" If not specified, the artifact is not downloaded.")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "don't print artifact's details")
 

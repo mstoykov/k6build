@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/grafana/k6build/cmd/cache"
-	"github.com/grafana/k6build/cmd/client"
 	"github.com/grafana/k6build/cmd/local"
+	"github.com/grafana/k6build/cmd/remote"
 	"github.com/grafana/k6build/cmd/server"
 )
 
@@ -23,7 +23,7 @@ func New() *cobra.Command {
 	}
 
 	root.AddCommand(cache.New())
-	root.AddCommand(client.New())
+	root.AddCommand(remote.New())
 	root.AddCommand(local.New())
 	root.AddCommand(server.New())
 

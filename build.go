@@ -40,14 +40,33 @@ type Artifact struct {
 
 // String returns a text serialization of the Artifact
 func (a Artifact) String() string {
+	return a.toString(true, " ")
+}
+
+// Print returns a string with a pretty print of the artifact
+func (a Artifact) Print() string {
+	return a.toString(true, "\n")
+}
+
+// PrintSummary returns a string with a pretty print of the artifact
+func (a Artifact) PrintSummary() string {
+	return a.toString(false, "\n")
+}
+
+// Print returns a text serialization of the Artifact
+func (a Artifact) toString(details bool, sep string) string {
 	buffer := &bytes.Buffer{}
-	buffer.WriteString(fmt.Sprintf(" id: %s", a.ID))
-	buffer.WriteString(fmt.Sprintf("platform: %s", a.Platform))
-	for dep, version := range a.Dependencies {
-		buffer.WriteString(fmt.Sprintf(" %s:%q", dep, version))
+	if details {
+		buffer.WriteString(fmt.Sprintf("id: %s%s", a.ID, sep))
 	}
-	buffer.WriteString(fmt.Sprintf(" checksum: %s", a.Checksum))
-	buffer.WriteString(fmt.Sprintf(" url: %s", a.URL))
+	buffer.WriteString(fmt.Sprintf("platform: %s%s", a.Platform, sep))
+	for dep, version := range a.Dependencies {
+		buffer.WriteString(fmt.Sprintf("%s:%q%s", dep, version, sep))
+	}
+	buffer.WriteString(fmt.Sprintf("checksum: %s%s", a.Checksum, sep))
+	if details {
+		buffer.WriteString(fmt.Sprintf("url: %s%s", a.URL, sep))
+	}
 	return buffer.String()
 }
 
