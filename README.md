@@ -242,8 +242,7 @@ k6build server -e GOPROXY=http://localhost:80
 ## Flags
 
 ```
-  -f, --cache-dir string     cache dir (default "/tmp/buildservice")
-      --cache-url string     cache server url. If not specified, a local cache server is started
+      --cache-url string     cache server url (default "http://localhost:9000")
   -c, --catalog string       dependencies catalog (default "catalog.json")
   -g, --copy-go-env          copy go environment (default true)
   -e, --env stringToString   build environment variables (default [])
