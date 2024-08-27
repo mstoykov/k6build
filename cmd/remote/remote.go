@@ -2,7 +2,6 @@
 package remote
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,26 +24,23 @@ binary artifact and optionally download it.
 # build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
 k6build remote -s http://localhost:8000 \
     -k v0.51.0 \
-    -p linux/amd64 
+    -p linux/amd64 \
     -d k6/x/kubernetes:v0.8.0 \
     -d k6/x/output-kafka:v0.7.0
 
-{
-    "id": "62d08b13fdef171435e2c6874eaad0bb35f2f9c7",
-    "url": "http://localhost:8000/cache/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download",
-    "dependencies": {
-	"k6": "v0.51.0",
-	"k6/x/kubernetes": "v0.9.0",
-	"k6/x/output-kafka": "v0.7.0"
-    },
-    "platform": "linux/amd64",
-    "checksum": "f4af178bb2e29862c0fc7d481076c9ba4468572903480fe9d6c999fea75f3793"
-}
+id: 62d08b13fdef171435e2c6874eaad0bb35f2f9c7
+platform: linux/amd64
+k6: v0.51.0
+k6/x/kubernetes: v0.9.0
+k6/x/output-kafka": v0.7.0
+checksum: f4af178bb2e29862c0fc7d481076c9ba4468572903480fe9d6c999fea75f3793
+url: http://localhost:8000/cache/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download
+
 
 # build k6 v0.51 with k6/x/output-kafka v0.7.0 and download as 'build/k6'
-k6build remote -s http://localhost:8000
-    -p linux/amd64 
-    -k v0.51.0 -d k6/x/output-kafka:v0.7.0
+k6build remote -s http://localhost:8000 \
+    -p linux/amd64  \
+    -k v0.51.0 -d k6/x/output-kafka:v0.7.0 \
     -o build/k6 -q
 
 # check downloaded binary
@@ -56,7 +52,7 @@ Extensions:
 )
 
 // New creates new cobra command for build client command.
-func New() *cobra.Command { //nolint:funlen
+func New() *cobra.Command {
 	var (
 		config   client.BuildServiceClientConfig
 		deps     []string
@@ -96,12 +92,7 @@ func New() *cobra.Command { //nolint:funlen
 			}
 
 			if !quiet {
-				encoder := json.NewEncoder(os.Stdout)
-				encoder.SetIndent("", "  ")
-				err = encoder.Encode(artifact)
-				if err != nil {
-					return fmt.Errorf("processing response %w", err)
-				}
+				fmt.Println(artifact.Print())
 			}
 
 			if output != "" {
