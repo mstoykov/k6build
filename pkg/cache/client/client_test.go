@@ -1,4 +1,4 @@
-package k6build
+package client
 
 import (
 	"bytes"
@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/cache/api"
 )
 
 // returns a HandleFunc that returns a canned status and response
-func handlerMock(status int, resp *CacheServerResponse) http.HandlerFunc {
+func handlerMock(status int, resp *api.CacheResponse) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 
@@ -48,29 +51,29 @@ func TestCacheClientGet(t *testing.T) {
 	testCases := []struct {
 		title     string
 		status    int
-		resp      *CacheServerResponse
+		resp      *api.CacheResponse
 		expectErr error
 	}{
 		{
 			title:  "normal get",
 			status: http.StatusOK,
-			resp: &CacheServerResponse{
+			resp: &api.CacheResponse{
 				Error:  "",
-				Object: Object{},
+				Object: cache.Object{},
 			},
 		},
 		{
 			title:     "object not found",
 			status:    http.StatusNotFound,
 			resp:      nil,
-			expectErr: ErrObjectNotFound,
+			expectErr: cache.ErrObjectNotFound,
 		},
 		{
 			title:  "error accessing object",
 			status: http.StatusInternalServerError,
-			resp: &CacheServerResponse{
+			resp: &api.CacheResponse{
 				Error:  "Error accessing object",
-				Object: Object{},
+				Object: cache.Object{},
 			},
 			expectErr: ErrRequestFailed,
 		},
@@ -102,23 +105,23 @@ func TestCacheClientStore(t *testing.T) {
 	testCases := []struct {
 		title     string
 		status    int
-		resp      *CacheServerResponse
+		resp      *api.CacheResponse
 		expectErr error
 	}{
 		{
 			title:  "normal response",
 			status: http.StatusOK,
-			resp: &CacheServerResponse{
+			resp: &api.CacheResponse{
 				Error:  "",
-				Object: Object{},
+				Object: cache.Object{},
 			},
 		},
 		{
 			title:  "error creating object",
 			status: http.StatusInternalServerError,
-			resp: &CacheServerResponse{
+			resp: &api.CacheResponse{
 				Error:  "Error creating object",
-				Object: Object{},
+				Object: cache.Object{},
 			},
 			expectErr: ErrRequestFailed,
 		},
@@ -177,7 +180,7 @@ func TestCacheClientDownload(t *testing.T) {
 				t.Fatalf("test setup %v", err)
 			}
 
-			obj := Object{
+			obj := cache.Object{
 				ID:  "object",
 				URL: srv.URL,
 			}

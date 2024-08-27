@@ -1,4 +1,5 @@
-package cmd
+// Package cache implements the cache command
+package cache
 
 import (
 	"fmt"
@@ -7,11 +8,14 @@ import (
 	"os"
 
 	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/cache/file"
+	"github.com/grafana/k6build/pkg/cache/server"
+
 	"github.com/spf13/cobra"
 )
 
 const (
-	cacheLong = `
+	long = `
 Starts a k6build cache server. 
 
 The cache server offers a REST API for storing and downloading objects.
@@ -22,7 +26,7 @@ The --download-url specifies the base URL for downloading objects. This is neces
 downloading the objects from different machines.
 `
 
-	cacheExample = `
+	example = `
 # start the cache server serving an external url
 k6build cache --download0url http://external.url
 
@@ -42,8 +46,8 @@ curl http://external.url:9000/cache/objectID/download
 `
 )
 
-// NewCache creates new cobra command for cache command.
-func NewCache() *cobra.Command {
+// New creates new cobra command for cache command.
+func New() *cobra.Command {
 	var (
 		cacheDir    string
 		cacheSrvURL string
@@ -54,8 +58,8 @@ func NewCache() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cache",
 		Short:   "k6 cache server",
-		Long:    cacheLong,
-		Example: cacheExample,
+		Long:    long,
+		Example: example,
 		// prevent the usage help to printed to stderr when an error is reported by a subcommand
 		SilenceUsage: true,
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
@@ -76,7 +80,7 @@ func NewCache() *cobra.Command {
 				),
 			)
 
-			cache, err := k6build.NewFileCache(cacheDir)
+			cache, err := file.NewFileCache(cacheDir)
 			if err != nil {
 				return fmt.Errorf("creating cache %w", err)
 			}
@@ -85,12 +89,12 @@ func NewCache() *cobra.Command {
 			if cacheSrvURL == "" {
 				cacheSrvURL = fmt.Sprintf("http://localhost:%d/cache", port)
 			}
-			config := k6build.CacheServerConfig{
+			config := server.CacheServerConfig{
 				BaseURL: cacheSrvURL,
 				Cache:   cache,
 				Log:     log,
 			}
-			cacheSrv := k6build.NewCacheServer(config)
+			cacheSrv := server.NewCacheServer(config)
 
 			srv := http.NewServeMux()
 			srv.Handle("/cache/", http.StripPrefix("/cache", cacheSrv))

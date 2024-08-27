@@ -1,17 +1,16 @@
-package k6build
+package local
 
 import (
 	"context"
 	"errors"
 	"testing"
 
+	"github.com/grafana/k6build"
 	"github.com/grafana/k6catalog"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
-
-func dependencyComp(a, b Module) bool { return a.Path < b.Path }
 
 func TestDependencyResolution(t *testing.T) {
 	t.Parallel()
@@ -19,40 +18,40 @@ func TestDependencyResolution(t *testing.T) {
 	testCases := []struct {
 		title     string
 		k6        string
-		deps      []Dependency
+		deps      []k6build.Dependency
 		expectErr error
-		expect    Artifact
+		expect    k6build.Artifact
 	}{
 		{
 			title:     "build k6 v0.1.0 ",
 			k6:        "v0.1.0",
-			deps:      []Dependency{},
+			deps:      []k6build.Dependency{},
 			expectErr: nil,
-			expect: Artifact{
+			expect: k6build.Artifact{
 				Dependencies: map[string]string{"k6": "v0.1.0"},
 			},
 		},
 		{
 			title:     "build k6 >v0.1.0",
 			k6:        ">v0.1.0",
-			deps:      []Dependency{},
+			deps:      []k6build.Dependency{},
 			expectErr: nil,
-			expect: Artifact{
+			expect: k6build.Artifact{
 				Dependencies: map[string]string{"k6": "v0.2.0"},
 			},
 		},
 		{
 			title:     "build unsatisfied k6 constrain (>v0.2.0)",
 			k6:        ">v0.2.0",
-			deps:      []Dependency{},
+			deps:      []k6build.Dependency{},
 			expectErr: k6catalog.ErrCannotSatisfy,
 		},
 		{
 			title:     "build k6 v0.1.0 exact dependency constraint",
 			k6:        "v0.1.0",
-			deps:      []Dependency{{Name: "k6/x/ext", Constraints: "v0.1.0"}},
+			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: "v0.1.0"}},
 			expectErr: nil,
-			expect: Artifact{
+			expect: k6build.Artifact{
 				Dependencies: map[string]string{
 					"k6":       "v0.1.0",
 					"k6/x/ext": "v0.1.0",
@@ -62,7 +61,7 @@ func TestDependencyResolution(t *testing.T) {
 		{
 			title:     "build k6 v0.1.0 unsatisfied dependency constrain",
 			k6:        "v0.1.0",
-			deps:      []Dependency{{Name: "k6/x/ext", Constraints: ">v0.2.0"}},
+			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: ">v0.2.0"}},
 			expectErr: k6catalog.ErrCannotSatisfy,
 		},
 	}
@@ -72,12 +71,7 @@ func TestDependencyResolution(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			buildsrv, err := SetupTestLocalBuildService(
-				LocalBuildServiceConfig{
-					CacheDir: t.TempDir(),
-					Catalog:  "testdata/catalog.json",
-				},
-			)
+			buildsrv, err := SetupTestLocalBuildService(t)
 			if err != nil {
 				t.Fatalf("test setup %v", err)
 			}
@@ -98,7 +92,7 @@ func TestDependencyResolution(t *testing.T) {
 				return
 			}
 
-			diff := cmp.Diff(tc.expect.Dependencies, artifact.Dependencies, cmpopts.SortSlices(dependencyComp))
+			diff := cmp.Diff(tc.expect.Dependencies, artifact.Dependencies, cmpopts.SortSlices(DependencyComp))
 			if diff != "" {
 				t.Fatalf("dependencies don't match: %s\n", diff)
 			}
@@ -108,12 +102,7 @@ func TestDependencyResolution(t *testing.T) {
 
 func TestIdempotentBuild(t *testing.T) {
 	t.Parallel()
-	buildsrv, err := SetupTestLocalBuildService(
-		LocalBuildServiceConfig{
-			CacheDir: t.TempDir(),
-			Catalog:  "testdata/catalog.json",
-		},
-	)
+	buildsrv, err := SetupTestLocalBuildService(t)
 	if err != nil {
 		t.Fatalf("test setup %v", err)
 	}
@@ -122,7 +111,7 @@ func TestIdempotentBuild(t *testing.T) {
 		context.TODO(),
 		"linux/amd64",
 		"v0.1.0",
-		[]Dependency{
+		[]k6build.Dependency{
 			{Name: "k6/x/ext", Constraints: "v0.1.0"},
 			{Name: "k6/x/ext2", Constraints: "v0.1.0"},
 		},
@@ -138,13 +127,13 @@ func TestIdempotentBuild(t *testing.T) {
 			title    string
 			platform string
 			k6       string
-			deps     []Dependency
+			deps     []k6build.Dependency
 		}{
 			{
 				title:    "same dependencies",
 				platform: "linux/amd64",
 				k6:       "v0.1.0",
-				deps: []Dependency{
+				deps: []k6build.Dependency{
 					{Name: "k6/x/ext", Constraints: "v0.1.0"},
 					{Name: "k6/x/ext2", Constraints: "v0.1.0"},
 				},
@@ -153,7 +142,7 @@ func TestIdempotentBuild(t *testing.T) {
 				title:    "different order of dependencies",
 				platform: "linux/amd64",
 				k6:       "v0.1.0",
-				deps: []Dependency{
+				deps: []k6build.Dependency{
 					{Name: "k6/x/ext2", Constraints: "v0.1.0"},
 					{Name: "k6/x/ext", Constraints: "v0.1.0"},
 				},
@@ -178,7 +167,7 @@ func TestIdempotentBuild(t *testing.T) {
 					t.Fatalf("artifact ID don't match")
 				}
 
-				diff := cmp.Diff(artifact.Dependencies, rebuild.Dependencies, cmpopts.SortSlices(dependencyComp))
+				diff := cmp.Diff(artifact.Dependencies, rebuild.Dependencies, cmpopts.SortSlices(DependencyComp))
 				if diff != "" {
 					t.Fatalf("dependencies don't match: %s\n", diff)
 				}
@@ -193,13 +182,13 @@ func TestIdempotentBuild(t *testing.T) {
 			title    string
 			platform string
 			k6       string
-			deps     []Dependency
+			deps     []k6build.Dependency
 		}{
 			{
 				title:    "different k6 versions",
 				platform: "linux/amd64",
 				k6:       "v0.2.0",
-				deps: []Dependency{
+				deps: []k6build.Dependency{
 					{Name: "k6/x/ext", Constraints: "v0.1.0"},
 					{Name: "k6/x/ext2", Constraints: "v0.1.0"},
 				},
@@ -208,7 +197,7 @@ func TestIdempotentBuild(t *testing.T) {
 				title:    "different dependency versions",
 				platform: "linux/amd64",
 				k6:       "v0.1.0",
-				deps: []Dependency{
+				deps: []k6build.Dependency{
 					{Name: "k6/x/ext", Constraints: "v0.2.0"},
 					{Name: "k6/x/ext2", Constraints: "v0.1.0"},
 				},
@@ -217,7 +206,7 @@ func TestIdempotentBuild(t *testing.T) {
 				title:    "different dependencies",
 				platform: "linux/amd64",
 				k6:       "v0.1.0",
-				deps: []Dependency{
+				deps: []k6build.Dependency{
 					{Name: "k6/x/ext", Constraints: "v0.1.0"},
 				},
 			},
@@ -225,7 +214,7 @@ func TestIdempotentBuild(t *testing.T) {
 				title:    "different platform",
 				platform: "linux/arm64",
 				k6:       "v0.1.0",
-				deps: []Dependency{
+				deps: []k6build.Dependency{
 					{Name: "k6/x/ext", Constraints: "v0.1.0"},
 					{Name: "k6/x/ext2", Constraints: "v0.1.0"},
 				},

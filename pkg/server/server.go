@@ -1,48 +1,27 @@
-package k6build
+// Package server implements a build server
+package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/api"
 )
-
-// BuildRequest defines a request to the build service
-type BuildRequest struct {
-	K6Constrains string       `json:"k6:omitempty"`
-	Dependencies []Dependency `json:"dependencies,omitempty"`
-	Platform     string       `json:"platformomitempty"`
-}
-
-// String returns a text serialization of the BuildRequest
-func (r BuildRequest) String() string {
-	buffer := &bytes.Buffer{}
-	buffer.WriteString(fmt.Sprintf("platform: %s", r.Platform))
-	buffer.WriteString(fmt.Sprintf("k6: %s", r.K6Constrains))
-	for _, d := range r.Dependencies {
-		buffer.WriteString(fmt.Sprintf("%s:%q", d.Name, d.Constraints))
-	}
-	return buffer.String()
-}
-
-// BuildResponse defines the response for a BuildRequest
-type BuildResponse struct {
-	Error    string   `json:"error:omitempty"`
-	Artifact Artifact `json:"artifact:omitempty"`
-}
 
 // APIServerConfig defines the configuration for the APIServer
 type APIServerConfig struct {
-	BuildService BuildService
+	BuildService k6build.BuildService
 	Log          *slog.Logger
 }
 
 // APIServer defines a k6build API server
 type APIServer struct {
-	srv BuildService
+	srv k6build.BuildService
 	log *slog.Logger
 }
 
@@ -66,7 +45,7 @@ func NewAPIServer(config APIServerConfig) *APIServer {
 
 // ServeHTTP implements the request handler for the build API server
 func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	resp := BuildResponse{}
+	resp := api.BuildResponse{}
 
 	w.Header().Add("Content-Type", "application/json")
 
@@ -78,7 +57,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	req := BuildRequest{}
+	req := api.BuildRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)

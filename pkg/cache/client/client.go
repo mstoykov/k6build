@@ -1,12 +1,26 @@
-package k6build
+// Package client implements a cache client
+package client
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/cache/api"
+)
+
+var (
+	ErrAccessingServer = errors.New("making request")        //nolint:revive
+	ErrInvalidConfig   = errors.New("invalid configuration") //nolint:revive
+	ErrInvalidRequest  = errors.New("invalid request")       //nolint:revive
+	ErrInvalidResponse = errors.New("invalid response")      //nolint:revive
+	ErrRequestFailed   = errors.New("request failed")        //nolint:revive
+
 )
 
 // CacheClientConfig defines the configuration for accessing a remote cache service
@@ -31,13 +45,13 @@ func NewCacheClient(config CacheClientConfig) (*CacheClient, error) {
 }
 
 // Get retrieves an objects if exists in the cache or an error otherwise
-func (c *CacheClient) Get(_ context.Context, id string) (Object, error) {
+func (c *CacheClient) Get(_ context.Context, id string) (cache.Object, error) {
 	url := fmt.Sprintf("%s/%s", c.server, id)
 
 	// TODO: use http.Request
 	resp, err := http.Get(url) //nolint:gosec,noctx
 	if err != nil {
-		return Object{}, fmt.Errorf("%w %w", ErrAccessingServer, err)
+		return cache.Object{}, fmt.Errorf("%w %w", ErrAccessingServer, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -45,26 +59,26 @@ func (c *CacheClient) Get(_ context.Context, id string) (Object, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
-			return Object{}, fmt.Errorf("%w with status", ErrObjectNotFound)
+			return cache.Object{}, fmt.Errorf("%w with status", cache.ErrObjectNotFound)
 		}
-		return Object{}, fmt.Errorf("%w with status %s", ErrRequestFailed, resp.Status)
+		return cache.Object{}, fmt.Errorf("%w with status %s", ErrRequestFailed, resp.Status)
 	}
 
-	cacheResponse := CacheServerResponse{}
+	cacheResponse := api.CacheResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 	if err != nil {
-		return Object{}, fmt.Errorf("%w: %s", ErrInvalidResponse, err.Error())
+		return cache.Object{}, fmt.Errorf("%w: %s", ErrInvalidResponse, err.Error())
 	}
 
 	if cacheResponse.Error != "" {
-		return Object{}, fmt.Errorf("%w: %s", ErrRequestFailed, cacheResponse.Error)
+		return cache.Object{}, fmt.Errorf("%w: %s", ErrRequestFailed, cacheResponse.Error)
 	}
 
 	return cacheResponse.Object, nil
 }
 
 // Store stores the object and returns the metadata
-func (c *CacheClient) Store(_ context.Context, id string, content io.Reader) (Object, error) {
+func (c *CacheClient) Store(_ context.Context, id string, content io.Reader) (cache.Object, error) {
 	url := fmt.Sprintf("%s/%s", c.server, id)
 	resp, err := http.Post( //nolint:gosec,noctx
 		url,
@@ -72,31 +86,30 @@ func (c *CacheClient) Store(_ context.Context, id string, content io.Reader) (Ob
 		content,
 	)
 	if err != nil {
-		return Object{}, fmt.Errorf("%w %w", ErrAccessingServer, err)
+		return cache.Object{}, fmt.Errorf("%w %w", ErrAccessingServer, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return Object{}, fmt.Errorf("%w with status %s", ErrRequestFailed, resp.Status)
+		return cache.Object{}, fmt.Errorf("%w with status %s", ErrRequestFailed, resp.Status)
 	}
-
-	cacheResponse := CacheServerResponse{}
+	cacheResponse := api.CacheResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 	if err != nil {
-		return Object{}, fmt.Errorf("%w: %s", ErrInvalidResponse, err.Error())
+		return cache.Object{}, fmt.Errorf("%w: %s", ErrInvalidResponse, err.Error())
 	}
 
 	if cacheResponse.Error != "" {
-		return Object{}, fmt.Errorf("%w: %s", ErrRequestFailed, cacheResponse.Error)
+		return cache.Object{}, fmt.Errorf("%w: %s", ErrRequestFailed, cacheResponse.Error)
 	}
 
 	return cacheResponse.Object, nil
 }
 
 // Download returns the content of the object given its url
-func (c *CacheClient) Download(_ context.Context, object Object) (io.ReadCloser, error) {
+func (c *CacheClient) Download(_ context.Context, object cache.Object) (io.ReadCloser, error) {
 	resp, err := http.Get(object.URL) //nolint:noctx,bodyclose
 	if err != nil {
 		return nil, fmt.Errorf("%w %w", ErrAccessingServer, err)

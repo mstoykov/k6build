@@ -1,4 +1,5 @@
-package k6build
+// Package server implements a cache server
+package server
 
 import (
 	"context"
@@ -8,25 +9,24 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/cache/api"
 )
 
-// CacheServerResponse is the response to a cache server request
-type CacheServerResponse struct {
-	Error  string
-	Object Object
-}
+var ErrInvalidRequest = errors.New("invalid request") //nolint:revive
 
 // CacheServer implements an http server that handles cache requests
 type CacheServer struct {
 	baseURL string
-	cache   Cache
+	cache   cache.Cache
 	log     *slog.Logger
 }
 
 // CacheServerConfig defines the configuration for the APIServer
 type CacheServerConfig struct {
 	BaseURL string
-	Cache   Cache
+	Cache   cache.Cache
 	Log     *slog.Logger
 }
 
@@ -59,7 +59,7 @@ func NewCacheServer(config CacheServerConfig) http.Handler {
 
 // Get retrieves an objects if exists in the cache or an error otherwise
 func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
-	resp := CacheServerResponse{}
+	resp := api.CacheResponse{}
 
 	w.Header().Add("Content-Type", "application/json")
 
@@ -80,7 +80,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 
 	object, err := s.cache.Get(context.Background(), id) //nolint:contextcheck
 	if err != nil {
-		if errors.Is(err, ErrObjectNotFound) {
+		if errors.Is(err, cache.ErrObjectNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -97,7 +97,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	downloadURL := fmt.Sprintf("%s/%s/download", baseURL, id)
 
-	resp.Object = Object{
+	resp.Object = cache.Object{
 		ID:       id,
 		Checksum: object.Checksum,
 		URL:      downloadURL,
@@ -109,7 +109,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 
 // Store stores the object and returns the metadata
 func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
-	resp := CacheServerResponse{}
+	resp := api.CacheResponse{}
 
 	w.Header().Add("Content-Type", "application/json")
 
@@ -142,7 +142,7 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	}
 	downloadURL := fmt.Sprintf("%s/%s/download", baseURL, id)
 
-	resp.Object = Object{
+	resp.Object = cache.Object{
 		ID:       id,
 		Checksum: object.Checksum,
 		URL:      downloadURL,
@@ -162,7 +162,7 @@ func (s *CacheServer) Download(w http.ResponseWriter, r *http.Request) {
 
 	object, err := s.cache.Get(context.Background(), id) //nolint:contextcheck
 	if err != nil {
-		if errors.Is(err, ErrObjectNotFound) {
+		if errors.Is(err, cache.ErrObjectNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)

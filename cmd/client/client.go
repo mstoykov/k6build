@@ -1,4 +1,5 @@
-package cmd
+// Package client implements the client command
+package client
 
 import (
 	"encoding/json"
@@ -9,15 +10,17 @@ import (
 	"strings"
 
 	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/client"
+
 	"github.com/spf13/cobra"
 )
 
 const (
-	clientLong = `
+	long = `
 k6build client connects to a remote build server
 `
 
-	clientExamples = `
+	example = `
 # build k6 v0.51.0 with k6/x/kubernetes v0.8.0 and k6/x/output-kafka v0.7.0
 k6build client -s http://localhost:8000 \
     -k v0.51.0 \
@@ -68,10 +71,10 @@ k6build client -s http://localhost:8000 \
 `
 )
 
-// NewClient creates new cobra command for build client command.
-func NewClient() *cobra.Command { //nolint:funlen
+// New creates new cobra command for build client command.
+func New() *cobra.Command { //nolint:funlen
 	var (
-		config   k6build.BuildServiceClientConfig
+		config   client.BuildServiceClientConfig
 		deps     []string
 		k6       string
 		output   string
@@ -82,14 +85,14 @@ func NewClient() *cobra.Command { //nolint:funlen
 	cmd := &cobra.Command{
 		Use:     "client",
 		Short:   "build k6 using a remote build server",
-		Long:    clientLong,
-		Example: clientExamples,
+		Long:    long,
+		Example: example,
 		// prevent the usage help to printed to stderr when an error is reported by a subcommand
 		SilenceUsage: true,
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			client, err := k6build.NewBuildServiceClient(config)
+			client, err := client.NewBuildServiceClient(config)
 			if err != nil {
 				return fmt.Errorf("configuring the client %w", err)
 			}
