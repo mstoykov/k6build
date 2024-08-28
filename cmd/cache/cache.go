@@ -57,7 +57,7 @@ func New() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "cache",
-		Short:   "k6 cache server",
+		Short:   "k6build cache server",
 		Long:    long,
 		Example: example,
 		// prevent the usage help to printed to stderr when an error is reported by a subcommand

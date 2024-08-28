@@ -7,7 +7,7 @@ Build k6 using one of the supported builders.
 
 ## Commands
 
-* [k6build cache](#k6build-cache)	 - k6 cache server
+* [k6build cache](#k6build-cache)	 - k6build cache server
 * [k6build local](#k6build-local)	 - build custom k6 binary locally
 * [k6build remote](#k6build-remote)	 - build a custom k6 using a remote build server
 * [k6build server](#k6build-server)	 - k6 build service
@@ -15,7 +15,7 @@ Build k6 using one of the supported builders.
 ---
 # k6build cache
 
-k6 cache server
+k6build cache server
 
 ## Synopsis
 
