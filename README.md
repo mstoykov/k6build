@@ -1,3 +1,19 @@
+# k6build
+
+k6build builds custom k6 binaries with extensions
+
+## Examples
+
+The following sections describe different usage scenarios.
+
+### kubernetes
+
+[examples/kubernetes](examples/kubernetes/) describes how to run `k6build` in a kubernetes cluster and execute `k6` tests in a pod using [k6exec](https://github.com/grafana/k6exec).
+
+### k6-operator
+
+TODO: use [k6-operator](https://github.com/grafana/k6-operator) for running the tests using a custom image.
+
 <!-- #region cli -->
 # k6build
 
