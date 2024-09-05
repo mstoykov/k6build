@@ -90,13 +90,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// overwrite URL with own
-	baseURL := s.baseURL
-	if baseURL == "" {
-		baseURL = fmt.Sprintf("http://%s%s", r.Host, r.RequestURI)
-	}
-	downloadURL := fmt.Sprintf("%s/%s/download", baseURL, id)
-
+	downloadURL := getDownloadURL(s.baseURL, r)
 	resp.Object = cache.Object{
 		ID:       id,
 		Checksum: object.Checksum,
@@ -135,13 +129,7 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// overwrite URL with own
-	baseURL := s.baseURL
-	if baseURL == "" {
-		baseURL = fmt.Sprintf("http://%s%s", r.Host, r.RequestURI)
-	}
-	downloadURL := fmt.Sprintf("%s/%s/download", baseURL, id)
-
+	downloadURL := getDownloadURL(s.baseURL, r)
 	resp.Object = cache.Object{
 		ID:       id,
 		Checksum: object.Checksum,
@@ -150,6 +138,14 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
+}
+
+func getDownloadURL(baseURL string, r *http.Request) string {
+	if baseURL != "" {
+		return fmt.Sprintf("%s/%s/download", baseURL, r.PathValue("id"))
+	}
+
+	return fmt.Sprintf("http://%s%s/download", r.Host, r.RequestURI)
 }
 
 // Download returns an object's content given its id
