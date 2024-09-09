@@ -252,7 +252,7 @@ k6build server -e GOPROXY=http://localhost:80
 
 ```
       --cache-url string     cache server url (default "http://localhost:9000")
-  -c, --catalog string       dependencies catalog (default "catalog.json")
+  -c, --catalog string       dependencies catalog. Can be path to a local file or an URL (default "https://registry.k6.io/catalog.json")
   -g, --copy-go-env          copy go environment (default true)
   -e, --env stringToString   build environment variables (default [])
   -h, --help                 help for server

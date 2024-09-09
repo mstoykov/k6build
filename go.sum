@@ -1,12 +1,12 @@
-github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
-github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
+github.com/Masterminds/semver/v3 v3.3.0 h1:B8LGeaivUe71a5qox1ICM/JLl0NqZSW5CHyL+hmvYS0=
+github.com/Masterminds/semver/v3 v3.3.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/grafana/clireadme v0.1.0 h1:KYEYSnYdSzmHf3bufaK6fQZ5j4dzvM/T+G6Ba+qNnAM=
 github.com/grafana/clireadme v0.1.0/go.mod h1:Wy4KIG2ZBGMYAYyF9l7qAy+yoJVasqk/txsRgoRI3gc=
-github.com/grafana/k6catalog v0.1.0 h1:jLmbmB3EUJ+zyQG3hWy6dWbtMjvTkvJNx1d4LX8it6I=
-github.com/grafana/k6catalog v0.1.0/go.mod h1:8R9eXAh2nb69+drkj0rZ4aemso0jcwCbPP6Q3E5LqCw=
+github.com/grafana/k6catalog v0.2.3 h1:Gol46qra9yjPYSrxLj6CDKcdY/DUEprM4Xd4TCNPkfA=
+github.com/grafana/k6catalog v0.2.3/go.mod h1:ozCf9+KBw63lNrRiZtp7CvzA7V0ATQuOQN2IoG2irw4=
 github.com/grafana/k6foundry v0.2.0 h1:+aE5wuCP0XNGNsxM7UiPj9hyw4RdWeW929PuGwLWIlg=
 github.com/grafana/k6foundry v0.2.0/go.mod h1:b6n4InFgXl+3yPobmlyJfcJmLozU9CI9IIUuq8YqEiM=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=

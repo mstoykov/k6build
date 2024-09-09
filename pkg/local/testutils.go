@@ -79,7 +79,7 @@ func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
 		return nil, fmt.Errorf("setting up test builder %w", err)
 	}
 
-	catalog, err := k6catalog.NewCatalogFromJSON("testdata/catalog.json")
+	catalog, err := k6catalog.NewCatalogFromFile("testdata/catalog.json")
 	if err != nil {
 		return nil, fmt.Errorf("setting up test builder %w", err)
 	}
