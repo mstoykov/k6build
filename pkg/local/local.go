@@ -27,7 +27,7 @@ type BuildServiceConfig struct {
 	// Set build environment variables
 	// Can be used for setting (or overriding, if CopyGoEnv is true) go environment variables
 	BuildEnv map[string]string
-	// path to catalog's json file
+	// path to catalog's json file. Can be a file path or a URL
 	Catalog string
 	// url to remote cache service
 	CacheURL string
@@ -48,9 +48,9 @@ type localBuildSrv struct {
 
 // NewBuildService creates a local build service using the given configuration
 func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.BuildService, error) {
-	catalog, err := k6catalog.NewCatalogFromJSON(config.Catalog)
+	catalog, err := k6catalog.NewCatalog(ctx, config.Catalog)
 	if err != nil {
-		return nil, fmt.Errorf("creating catalog %w", err)
+		return nil, fmt.Errorf("getting catalog %w", err)
 	}
 
 	builderOpts := k6foundry.NativeBuilderOpts{

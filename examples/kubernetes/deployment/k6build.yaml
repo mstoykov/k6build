@@ -45,6 +45,8 @@ spec:
     - "http://cachesrv:9000/cache"
     - "-e"
     - "CGO_ENABLED=1"
+    - "--catalog"
+    - "catalog.json"
     volumeMounts:
     - mountPath: "/home/k6build"
       name: catalog

@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/local"
 	server "github.com/grafana/k6build/pkg/server"
+	"github.com/grafana/k6catalog"
 
 	"github.com/spf13/cobra"
 )
@@ -86,7 +87,13 @@ func New() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&config.Catalog, "catalog", "c", "catalog.json", "dependencies catalog")
+	cmd.Flags().StringVarP(
+		&config.Catalog,
+		"catalog",
+		"c",
+		k6catalog.DefaultCatalogURL,
+		"dependencies catalog. Can be path to a local file or an URL",
+	)
 	cmd.Flags().StringVar(&config.CacheURL, "cache-url", "http://localhost:9000", "cache server url")
 	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
