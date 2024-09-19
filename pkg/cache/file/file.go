@@ -39,6 +39,7 @@ func NewFileCache(dir string) (cache.Cache, error) {
 }
 
 // Store stores the object and returns the metadata
+// Fails if the object already exists
 func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Object, error) {
 	if id == "" {
 		return cache.Object{}, fmt.Errorf("%w id cannot be empty", cache.ErrCreatingObject)
@@ -49,6 +50,11 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	}
 
 	objectDir := filepath.Join(f.dir, id)
+
+	if _, err := os.Stat(objectDir); !errors.Is(err, os.ErrNotExist) {
+		return cache.Object{}, fmt.Errorf("%w: object already exists %q", cache.ErrCreatingObject, id)
+	}
+
 	// TODO: check permissions
 	err := os.MkdirAll(objectDir, 0o750)
 	if err != nil {

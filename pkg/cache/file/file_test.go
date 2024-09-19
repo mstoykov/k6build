@@ -56,8 +56,9 @@ func TestFileCacheStoreObject(t *testing.T) {
 					content: []byte("content"),
 				},
 			},
-			id:      "object",
-			content: []byte("new content"),
+			id:        "object",
+			content:   []byte("new content"),
+			expectErr: cache.ErrCreatingObject,
 		},
 		{
 			title:   "store empty object",
