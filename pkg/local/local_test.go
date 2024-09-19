@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/grafana/k6build"
@@ -241,4 +242,67 @@ func TestIdempotentBuild(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestConcurrentBuilds tests that is sage to build the same artifact concurrently and that
+// concurrent builds of different artifacts are not affected.
+// The test uses a local test setup backed by a file cache.
+// Attempting to write the same artifact twice will return an error.
+func TestConcurrentBuilds(t *testing.T) {
+	t.Parallel()
+	buildsrv, err := SetupTestLocalBuildService(t)
+	if err != nil {
+		t.Fatalf("test setup %v", err)
+	}
+
+	builds := []struct {
+		k6Ver string
+		deps  []k6build.Dependency
+	}{
+		{
+			k6Ver: "v0.1.0",
+			deps: []k6build.Dependency{
+				{Name: "k6/x/ext", Constraints: "v0.1.0"},
+			},
+		},
+		{
+			k6Ver: "v0.1.0",
+			deps: []k6build.Dependency{
+				{Name: "k6/x/ext", Constraints: "v0.1.0"},
+			},
+		},
+		{
+			k6Ver: "v0.2.0",
+			deps: []k6build.Dependency{
+				{Name: "k6/x/ext", Constraints: "v0.1.0"},
+			},
+		},
+	}
+
+	errch := make(chan error, len(builds))
+
+	wg := sync.WaitGroup{}
+	for _, b := range builds {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			if _, err := buildsrv.Build(
+				context.TODO(),
+				"linux/amd64",
+				b.k6Ver,
+				b.deps,
+			); err != nil {
+				errch <- err
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	select {
+	case err := <-errch:
+		t.Fatalf("unexpected %v", err)
+	default:
+	}
 }

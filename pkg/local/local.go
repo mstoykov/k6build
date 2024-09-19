@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/cache"
@@ -44,6 +45,7 @@ type localBuildSrv struct {
 	catalog k6catalog.Catalog
 	builder k6foundry.Builder
 	cache   cache.Cache
+	mutexes sync.Map
 }
 
 // NewBuildService creates a local build service using the given configuration
@@ -158,6 +160,9 @@ func (b *localBuildSrv) Build(
 	}
 	id := fmt.Sprintf("%x", sha1.Sum(hashData.Bytes())) //nolint:gosec
 
+	unlock := b.lockArtifact(id)
+	defer unlock()
+
 	artifactObject, err := b.cache.Get(ctx, id)
 	if err == nil {
 		return k6build.Artifact{
@@ -191,4 +196,19 @@ func (b *localBuildSrv) Build(
 		Dependencies: resolved,
 		Platform:     platform,
 	}, nil
+}
+
+// lockArtifact obtains a mutex used to prevent concurrent builds of the same artifact and
+// returns a function that will unlock the mutex associated to the given id in the cache.
+// The lock is also removed from the map. Subsequent calls will get another lock on the same
+// id but this is safe as the object should already be in the cache and no further builds are needed.
+func (b *localBuildSrv) lockArtifact(id string) func() {
+	value, _ := b.mutexes.LoadOrStore(id, &sync.Mutex{})
+	mtx, _ := value.(*sync.Mutex)
+	mtx.Lock()
+
+	return func() {
+		b.mutexes.Delete(id)
+		mtx.Unlock()
+	}
 }
