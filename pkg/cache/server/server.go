@@ -63,29 +63,26 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 
-	// ensure errors are reported and logged
-	defer func() {
-		if resp.Error != "" {
-			s.log.Error(resp.Error)
-			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
-		}
-	}()
-
 	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = ErrInvalidRequest.Error()
+		s.log.Error(resp.Error)
+		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		return
 	}
 
 	object, err := s.cache.Get(context.Background(), id) //nolint:contextcheck
 	if err != nil {
 		if errors.Is(err, cache.ErrObjectNotFound) {
+			s.log.Debug(err.Error())
 			w.WriteHeader(http.StatusNotFound)
 		} else {
+			s.log.Error(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		resp.Error = err.Error()
+		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 
 		return
 	}
