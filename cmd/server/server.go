@@ -18,10 +18,14 @@ import (
 const (
 	long = `
 starts a k6build server
+
+Note: The build server does not support CGO_ENABLE when building binaries
+      due to this issue: https://github.com/grafana/k6build/issues/37
+      use --enable-cgo=true to enable CGO support
 `
 
 	example = `
-# start the build server using a custom catalog
+# start the build server using a custom local catalog
 k6build server -c /path/to/catalog.json
 
 # start the server the build server using a custom GOPROXY
@@ -29,11 +33,12 @@ k6build server -e GOPROXY=http://localhost:80`
 )
 
 // New creates new cobra command for the server command.
-func New() *cobra.Command {
+func New() *cobra.Command { //nolint:funlen
 	var (
-		config   local.BuildServiceConfig
-		logLevel string
-		port     int
+		config    local.BuildServiceConfig
+		logLevel  string
+		port      int
+		enableCgo bool
 	)
 
 	cmd := &cobra.Command{
@@ -60,6 +65,15 @@ func New() *cobra.Command {
 					},
 				),
 			)
+
+			if enableCgo {
+				log.Warn("enabling CGO for build service")
+			} else {
+				if config.BuildEnv == nil {
+					config.BuildEnv = make(map[string]string)
+				}
+				config.BuildEnv["CGO_ENABLED"] = "0"
+			}
 
 			buildSrv, err := local.NewBuildService(cmd.Context(), config)
 			if err != nil {
@@ -100,6 +114,7 @@ func New() *cobra.Command {
 	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")
 	cmd.Flags().IntVarP(&port, "port", "p", 8000, "port server will listen")
 	cmd.Flags().StringVarP(&logLevel, "log-level", "l", "INFO", "log level")
+	cmd.Flags().BoolVar(&enableCgo, "enable-cgo", false, "enable CGO for building binaries.")
 
 	return cmd
 }
