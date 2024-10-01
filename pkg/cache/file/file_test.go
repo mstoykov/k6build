@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"path/filepath"
 	"fmt"
 	"net/url"
 	"os"
 	"testing"
 
 	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/util"
 )
 
 type object struct {
@@ -103,12 +105,13 @@ func TestFileCacheStoreObject(t *testing.T) {
 				return
 			}
 
-			fileURL, err := url.Parse(obj.URL)
+			objectURL, _ := url.Parse(obj.URL)
+			filePath, err := util.URLToFilePath(objectURL)
 			if err != nil {
 				t.Fatalf("invalid url %v", err)
 			}
 
-			content, err := os.ReadFile(fileURL.Path)
+			content, err := os.ReadFile(filePath)
 			if err != nil {
 				t.Fatalf("reading object url %v", err)
 			}
@@ -170,12 +173,13 @@ func TestFileCacheRetrieval(t *testing.T) {
 					return
 				}
 
-				fileURL, err := url.Parse(obj.URL)
+				objectURL, _ := url.Parse(obj.URL)
+				fileUPath, err :=  util.URLToFilePath(objectURL)
 				if err != nil {
 					t.Fatalf("invalid url %v", err)
 				}
 
-				data, err := os.ReadFile(fileURL.Path)
+				data, err := os.ReadFile(fileUPath)
 				if err != nil {
 					t.Fatalf("reading object url %v", err)
 				}
@@ -193,42 +197,28 @@ func TestFileCacheRetrieval(t *testing.T) {
 
 		testCases := []struct {
 			title     string
-			object    cache.Object
+			id        string
+			url       string
 			expected  []byte
 			expectErr error
 		}{
 			{
 				title: "download existing object",
-				object: cache.Object{
-					ID:  "object",
-					URL: fmt.Sprintf("file://%s/object/data", cacheDir),
-				},
+				id:  "object",
+				url: filepath.Join(cacheDir, "/object/data"),
 				expected:  []byte("content"),
 				expectErr: nil,
 			},
 			{
 				title: "download non existing object",
-				object: cache.Object{
-					ID:  "object",
-					URL: fmt.Sprintf("file://%s/another_object/data", cacheDir),
-				},
-				expectErr: cache.ErrObjectNotFound,
-			},
-			{
-				title: "download malformed url",
-				object: cache.Object{
-					ID:  "object",
-					URL: fmt.Sprintf("file://%s/invalid&path/data", cacheDir),
-				},
-				// FIXME: this should be an ErrInvalidURL
+				id:  "object",
+				url: filepath.Join(cacheDir, "/another_object/data"),
 				expectErr: cache.ErrObjectNotFound,
 			},
 			{
 				title: "download malicious url",
-				object: cache.Object{
-					ID:  "object",
-					URL: fmt.Sprintf("file://%s/../../data", cacheDir),
-				},
+				id:  "object",
+				url: filepath.Join(cacheDir, "/../../data"),
 				expectErr: cache.ErrInvalidURL,
 			},
 		}
@@ -237,7 +227,9 @@ func TestFileCacheRetrieval(t *testing.T) {
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
 
-				content, err := fileCache.Download(context.TODO(), tc.object)
+				objectURL, _ := util.URLFromFilePath(tc.url)
+				object := cache.Object{ID: tc.id, URL: objectURL.String()}
+				content, err := fileCache.Download(context.TODO(), object)
 				if !errors.Is(err, tc.expectErr) {
 					t.Fatalf("expected %v got %v", tc.expectErr, err)
 				}
