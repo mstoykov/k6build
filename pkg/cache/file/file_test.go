@@ -239,6 +239,8 @@ func TestFileCacheRetrieval(t *testing.T) {
 					return
 				}
 
+				defer content.Close() //nolint:errcheck
+
 				data := bytes.Buffer{}
 				_, err = data.ReadFrom(content)
 				if err != nil {
