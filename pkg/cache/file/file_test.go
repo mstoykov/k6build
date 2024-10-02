@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/grafana/k6build/pkg/cache"
@@ -174,7 +174,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 				}
 
 				objectURL, _ := url.Parse(obj.URL)
-				fileUPath, err :=  util.URLToFilePath(objectURL)
+				fileUPath, err := util.URLToFilePath(objectURL)
 				if err != nil {
 					t.Fatalf("invalid url %v", err)
 				}
@@ -203,22 +203,22 @@ func TestFileCacheRetrieval(t *testing.T) {
 			expectErr error
 		}{
 			{
-				title: "download existing object",
-				id:  "object",
-				url: filepath.Join(cacheDir, "/object/data"),
+				title:     "download existing object",
+				id:        "object",
+				url:       filepath.Join(cacheDir, "/object/data"),
 				expected:  []byte("content"),
 				expectErr: nil,
 			},
 			{
-				title: "download non existing object",
-				id:  "object",
-				url: filepath.Join(cacheDir, "/another_object/data"),
+				title:     "download non existing object",
+				id:        "object",
+				url:       filepath.Join(cacheDir, "/another_object/data"),
 				expectErr: cache.ErrObjectNotFound,
 			},
 			{
-				title: "download malicious url",
-				id:  "object",
-				url: filepath.Join(cacheDir, "/../../data"),
+				title:     "download malicious url",
+				id:        "object",
+				url:       filepath.Join(cacheDir, "/../../data"),
 				expectErr: cache.ErrInvalidURL,
 			},
 		}

@@ -1,17 +1,22 @@
-
 package util
+
 import (
 	"net/url"
 	"runtime"
 	"testing"
 )
+
 func TestURLToFilePath(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range urlTests() {
 		if tc.url == "" {
 			continue
 		}
 		tc := tc
 		t.Run(tc.url, func(t *testing.T) {
+			t.Parallel()
+
 			u, err := url.Parse(tc.url)
 			if err != nil {
 				t.Fatalf("url.Parse(%q): %v", tc.url, err)
@@ -33,13 +38,18 @@ func TestURLToFilePath(t *testing.T) {
 		})
 	}
 }
+
 func TestURLFromFilePath(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range urlTests() {
 		if tc.filePath == "" {
 			continue
 		}
 		tc := tc
 		t.Run(tc.filePath, func(t *testing.T) {
+			t.Parallel()
+
 			u, err := URLFromFilePath(tc.filePath)
 			if err != nil {
 				if err.Error() == tc.wantErr {
@@ -64,18 +74,21 @@ func TestURLFromFilePath(t *testing.T) {
 		})
 	}
 }
+
 func urlTests() []urlTest {
 	if runtime.GOOS == "windows" {
 		return urlTestsWindows
 	}
 	return urlTestsOthers
 }
+
 type urlTest struct {
 	url          string
 	filePath     string
 	canonicalURL string // If empty, assume equal to url.
 	wantErr      string
 }
+
 var urlTestsOthers = []urlTest{
 	// Examples from RFC 8089:
 	{
@@ -98,6 +111,7 @@ var urlTestsOthers = []urlTest{
 		wantErr: "file URL specifies non-local host",
 	},
 }
+
 var urlTestsWindows = []urlTest{
 	// Examples from https://blogs.msdn.microsoft.com/ie/2006/12/06/file-uris-in-windows/:
 	{

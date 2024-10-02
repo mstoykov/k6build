@@ -65,7 +65,6 @@ func URLFromFilePath(path string) (*url.URL, error) {
 	}, nil
 }
 
-
 // URLToFilePath converts a file-scheme url to a file path.
 func URLToFilePath(u *url.URL) (string, error) {
 	if u.Scheme != "file" {
