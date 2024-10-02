@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/util"
 )
 
 // Cache a Cache backed by a file system
@@ -65,6 +66,7 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	if err != nil {
 		return cache.Object{}, fmt.Errorf("%w: %w", cache.ErrCreatingObject, err)
 	}
+	defer objectFile.Close() //nolint:errcheck
 
 	// write content to object file and copy to buffer to calculate checksum
 	// TODO: optimize memory by copying content in blocks
@@ -83,10 +85,11 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 		return cache.Object{}, fmt.Errorf("%w: %w", cache.ErrCreatingObject, err)
 	}
 
+	objectURL, _ := util.URLFromFilePath(objectFile.Name())
 	return cache.Object{
 		ID:       id,
 		Checksum: checksum,
-		URL:      fmt.Sprintf("file://%s", objectFile.Name()),
+		URL:      objectURL.String(),
 	}, nil
 }
 
@@ -108,10 +111,11 @@ func (f *Cache) Get(_ context.Context, id string) (cache.Object, error) {
 		return cache.Object{}, fmt.Errorf("%w: %w", cache.ErrAccessingObject, err)
 	}
 
+	objectURL, _ := util.URLFromFilePath(filepath.Join(objectDir, "data"))
 	return cache.Object{
 		ID:       id,
 		Checksum: string(checksum),
-		URL:      fmt.Sprintf("file://%s", filepath.Join(objectDir, "data")),
+		URL:      objectURL.String(),
 	}, nil
 }
 
@@ -124,8 +128,13 @@ func (f *Cache) Download(_ context.Context, object cache.Object) (io.ReadCloser,
 
 	switch url.Scheme {
 	case "file":
+		objectPath, err := util.URLToFilePath(url)
+		if err != nil {
+			return nil, err
+		}
+
 		// prevent malicious path
-		objectPath, err := f.sanitizePath(url.Path)
+		objectPath, err = f.sanitizePath(objectPath)
 		if err != nil {
 			return nil, err
 		}
