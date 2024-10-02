@@ -66,6 +66,7 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	if err != nil {
 		return cache.Object{}, fmt.Errorf("%w: %w", cache.ErrCreatingObject, err)
 	}
+	defer objectFile.Close() //nolint:errcheck
 
 	// write content to object file and copy to buffer to calculate checksum
 	// TODO: optimize memory by copying content in blocks
