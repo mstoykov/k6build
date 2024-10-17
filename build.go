@@ -1,4 +1,4 @@
-// Package k6build defines a service for building k8 binaries
+// Package k6build defines a service for building k6 binaries
 package k6build
 
 import (
@@ -21,7 +21,7 @@ type Dependency struct {
 // Module defines an artifact dependency
 type Module struct {
 	Path    string `json:"path,omitempty"`
-	Version string `json:"vesion,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
 // Artifact defines a binary that can be downloaded

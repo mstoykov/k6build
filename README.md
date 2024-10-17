@@ -55,7 +55,7 @@ k6build cache [flags]
 ```
 
 # start the cache server serving an external url
-k6build cache --download0url http://external.url
+k6build cache --download-url http://external.url
 
 # store object from same host
 curl -x POST http://localhost:9000/cache/objectID -d "object content" | jq .
