@@ -36,7 +36,7 @@ type BuildServiceConfig struct {
 	CacheDir string
 	// Copy go environment. BuildEnv can override the variables copied from go environment.
 	CopyGoEnv bool
-	// ser verbose build mode
+	// set verbose build mode
 	Verbose bool
 }
 

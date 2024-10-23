@@ -141,7 +141,7 @@ func (f *Cache) Download(_ context.Context, object cache.Object) (io.ReadCloser,
 
 		objectFile, err := os.Open(objectPath) //nolint:gosec // path is sanitized
 		if err != nil {
-			// FIXE: is the path has invalid characters, still will return ErrNotExists
+			// FIXME: is the path has invalid characters, still will return ErrNotExists
 			if errors.Is(err, os.ErrNotExist) {
 				return nil, cache.ErrObjectNotFound
 			}
