@@ -115,6 +115,7 @@ func New() *cobra.Command { //nolint:funlen
 	cmd.Flags().IntVarP(&port, "port", "p", 8000, "port server will listen")
 	cmd.Flags().StringVarP(&logLevel, "log-level", "l", "INFO", "log level")
 	cmd.Flags().BoolVar(&enableCgo, "enable-cgo", false, "enable CGO for building binaries.")
+	cmd.Flags().BoolVar(&config.AllowPrereleases, "allow-prereleases", false, "allow building pre-releases.")
 
 	return cmd
 }

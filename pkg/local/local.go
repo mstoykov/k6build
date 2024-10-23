@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"sync"
 
@@ -20,7 +21,18 @@ import (
 )
 
 const (
-	k6Dep = "k6"
+	k6Dep  = "k6"
+	k6Path = "go.k6.io/k6"
+
+	opRe  = `(?<operator>[=|~|>|<|\^|>=|<=|!=]){0,1}(?:\s*)`
+	verRe = `(?P<version>[v|V](?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`
+	preRe = `(?:[+|-|])(?P<prerelease>(?:[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))`
+)
+
+var (
+	ErrInvalidConstrains = errors.New("invalid constrains") //nolint:revive
+
+	constrainRe = regexp.MustCompile(opRe + verRe + preRe)
 )
 
 // BuildServiceConfig defines the configuration for a Local build service
@@ -38,14 +50,17 @@ type BuildServiceConfig struct {
 	CopyGoEnv bool
 	// set verbose build mode
 	Verbose bool
+	// Allow prerelease versions
+	AllowPrereleases bool
 }
 
 // buildSrv implements the BuildService interface
 type localBuildSrv struct {
-	catalog k6catalog.Catalog
-	builder k6foundry.Builder
-	cache   cache.Cache
-	mutexes sync.Map
+	allowPrereleases bool
+	catalog          k6catalog.Catalog
+	builder          k6foundry.Builder
+	cache            cache.Cache
+	mutexes          sync.Map
 }
 
 // NewBuildService creates a local build service using the given configuration
@@ -90,9 +105,10 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 	}
 
 	return &localBuildSrv{
-		catalog: catalog,
-		builder: builder,
-		cache:   cache,
+		allowPrereleases: config.AllowPrereleases,
+		catalog:          catalog,
+		builder:          builder,
+		cache:            cache,
 	}, nil
 }
 
@@ -120,7 +136,7 @@ func DefaultLocalBuildService() (k6build.BuildService, error) {
 	}, nil
 }
 
-func (b *localBuildSrv) Build(
+func (b *localBuildSrv) Build( //nolint:funlen
 	ctx context.Context,
 	platform string,
 	k6Constrains string,
@@ -135,9 +151,26 @@ func (b *localBuildSrv) Build(
 	sort.Slice(deps, func(i, j int) bool { return deps[i].Name < deps[j].Name })
 	resolved := map[string]string{}
 
-	k6Mod, err := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
+	// check if it is a pre-release version of the form v0.0.0-hash
+	// if it is a prerelease we don't check with the catalog, but instead we use
+	// the prerelease as version when building this module
+	// the build process will return the actual version built in the build info
+	// and we can check that version with the catalog
+	var k6Mod k6catalog.Module
+	prerelease, err := isPrerelease(k6Constrains)
 	if err != nil {
 		return k6build.Artifact{}, err
+	}
+	if prerelease != "" {
+		if !b.allowPrereleases {
+			return k6build.Artifact{}, fmt.Errorf("%w: pre-releases are not allowed", ErrInvalidConstrains)
+		}
+		k6Mod = k6catalog.Module{Path: k6Path, Version: prerelease}
+	} else {
+		k6Mod, err = b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
+		if err != nil {
+			return k6build.Artifact{}, err
+		}
 	}
 	resolved[k6Dep] = k6Mod.Version
 
@@ -179,9 +212,15 @@ func (b *localBuildSrv) Build(
 	}
 
 	artifactBuffer := &bytes.Buffer{}
-	err = b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
+	buildInfo, err := b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
 	if err != nil {
 		return k6build.Artifact{}, fmt.Errorf("building artifact  %w", err)
+	}
+
+	// if this is a prerelease, we must use the actual version built
+	// TODO: check this version is supported
+	if prerelease != "" {
+		resolved[k6Dep] = buildInfo.ModVersions[k6Mod.Path]
 	}
 
 	artifactObject, err = b.cache.Store(ctx, id, artifactBuffer)
@@ -211,4 +250,30 @@ func (b *localBuildSrv) lockArtifact(id string) func() {
 		b.mutexes.Delete(id)
 		mtx.Unlock()
 	}
+}
+
+// isPrerelease checks if the constrain references a pre-release version.
+// E.g.  v0.1.0+build-effa45f
+func isPrerelease(constrain string) (string, error) {
+	opInx := constrainRe.SubexpIndex("operator")
+	verIdx := constrainRe.SubexpIndex("version")
+	preIdx := constrainRe.SubexpIndex("prerelease")
+	matches := constrainRe.FindStringSubmatch(constrain)
+
+	if matches == nil {
+		return "", nil
+	}
+
+	op := matches[opInx]
+	ver := matches[verIdx]
+	prerelease := matches[preIdx]
+
+	if op != "" && op != "=" {
+		return "", fmt.Errorf("%w only exact match is allowed for pre-release versions", ErrInvalidConstrains)
+	}
+
+	if ver != "v0.0.0" {
+		return "", fmt.Errorf("%w prerelease version start with v0.0.0", ErrInvalidConstrains)
+	}
+	return prerelease, nil
 }
