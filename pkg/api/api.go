@@ -28,6 +28,6 @@ func (r BuildRequest) String() string {
 
 // BuildResponse defines the response for a BuildRequest
 type BuildResponse struct {
-	Error    string           `json:"error:omitempty"`
-	Artifact k6build.Artifact `json:"artifact:omitempty"`
+	Error    string           `json:"error,omitempty"`
+	Artifact k6build.Artifact `json:"artifact,omitempty"`
 }
