@@ -14,8 +14,7 @@ import (
 func New() *cobra.Command {
 	root := &cobra.Command{
 		Use:               "k6build",
-		Short:             "Build k6 with various builders.",
-		Long:              "Build k6 using one of the supported builders.",
+		Short:             "Build custom k6 binaries with extensions",
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		DisableAutoGenTag: true,

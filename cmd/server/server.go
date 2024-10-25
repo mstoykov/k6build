@@ -17,7 +17,37 @@ import (
 
 const (
 	long = `
-starts a k6build server
+Starts a k6build server
+
+The server exposes an API that can be used by clients for building artifacts.
+The API returns the metadata of the build artifact, including an URL for downloading it.
+
+For example
+
+curl http://localhost:8000/build/ -d \
+'{
+   "k6":"v0.50.0",
+   "dependencies":[
+       {
+        "name":"k6/x/kubernetes",
+	"constraints":">v0.8.0"
+        }
+    ],
+    "platform":"linux/amd64"
+}'
+
+{
+  "artifact": {
+    "id": "5a241ba6ff643075caadbd06d5a326e5e74f6f10",
+    "url": "http://localhost:9000/cache/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
+    "dependencies": {
+      "k6": "v0.50.0",
+      "k6/x/kubernetes": "v0.10.0"
+    },
+    "platform": "linux/amd64",
+    "checksum": "bfdf51ec9279e6d7f91df0a342d0c90ab4990ff1fb0215938505a6894edaf913"
+  }
+}
 
 Note: The build server does not support CGO_ENABLE when building binaries
       due to this issue: https://github.com/grafana/k6build/issues/37

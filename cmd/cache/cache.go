@@ -28,7 +28,7 @@ downloading the objects from different machines.
 
 	example = `
 # start the cache server serving an external url
-k6build cache --download0url http://external.url
+k6build cache --download-url http://external.url
 
 # store object from same host
 curl -x POST http://localhost:9000/cache/objectID -d "object content" | jq .
@@ -114,10 +114,8 @@ func New() *cobra.Command {
 	cmd.Flags().StringVarP(&cacheDir, "cache-dir", "c", "/tmp/cache/objectstore", "cache directory")
 	cmd.Flags().IntVarP(&port, "port", "p", 9000, "port server will listen")
 	cmd.Flags().StringVarP(&cacheSrvURL,
-		"download-url",
-		"d",
-		"",
-		"base url used for downloading objects. If not specified http://localhost:<port> is used",
+		"download-url", "d", "", "base url used for downloading objects."+
+			"\nIf not specified http://localhost:<port>/cache is used",
 	)
 	cmd.Flags().StringVarP(&logLevel, "log-level", "l", "INFO", "log level")
 

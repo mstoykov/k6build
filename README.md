@@ -2,7 +2,7 @@
 
 k6build builds custom k6 binaries with extensions
 
-## Examples
+## Usage scenarios
 
 The following sections describe different usage scenarios.
 
@@ -17,9 +17,7 @@ TODO: use [k6-operator](https://github.com/grafana/k6-operator) for running the 
 <!-- #region cli -->
 # k6build
 
-**Build k6 with various builders.**
-
-Build k6 using one of the supported builders.
+**Build custom k6 binaries with extensions**
 
 ## Commands
 
@@ -77,7 +75,8 @@ curl http://external.url:9000/cache/objectID/download
 
 ```
   -c, --cache-dir string      cache directory (default "/tmp/cache/objectstore")
-  -d, --download-url string   base url used for downloading objects. If not specified http://localhost:<port> is used
+  -d, --download-url string   base url used for downloading objects.
+                              If not specified http://localhost:<port>/cache is used
   -h, --help                  help for cache
   -l, --log-level string      log level (default "INFO")
   -p, --port int              port server will listen (default 9000)
@@ -85,7 +84,7 @@ curl http://external.url:9000/cache/objectID/download
 
 ## SEE ALSO
 
-* [k6build](#k6build)	 - Build k6 with various builders.
+* [k6build](#k6build)	 - Build custom k6 binaries with extensions
 
 ---
 # k6build local
@@ -154,7 +153,7 @@ k6build local -k v0.50.0 -e GOPROXY=http://localhost:80 -q
 
 ## SEE ALSO
 
-* [k6build](#k6build)	 - Build k6 with various builders.
+* [k6build](#k6build)	 - Build custom k6 binaries with extensions
 
 ---
 # k6build remote
@@ -220,7 +219,7 @@ Extensions:
 
 ## SEE ALSO
 
-* [k6build](#k6build)	 - Build k6 with various builders.
+* [k6build](#k6build)	 - Build custom k6 binaries with extensions
 
 ---
 # k6build server
@@ -230,7 +229,41 @@ k6 build service
 ## Synopsis
 
 
-starts a k6build server
+Starts a k6build server
+
+The server exposes an API that can be used by clients for building artifacts.
+The API returns the metadata of the build artifact, including an URL for downloading it.
+
+For example
+
+curl http://localhost:8000/build/ -d \
+'{
+   "k6":"v0.50.0",
+   "dependencies":[
+       {
+        "name":"k6/x/kubernetes",
+	"constraints":">v0.8.0"
+        }
+    ],
+    "platform":"linux/amd64"
+}'
+
+{
+  "artifact": {
+    "id": "5a241ba6ff643075caadbd06d5a326e5e74f6f10",
+    "url": "http://localhost:9000/cache/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
+    "dependencies": {
+      "k6": "v0.50.0",
+      "k6/x/kubernetes": "v0.10.0"
+    },
+    "platform": "linux/amd64",
+    "checksum": "bfdf51ec9279e6d7f91df0a342d0c90ab4990ff1fb0215938505a6894edaf913"
+  }
+}
+
+Note: The build server does not support CGO_ENABLE when building binaries
+      due to this issue: https://github.com/grafana/k6build/issues/37
+      use --enable-cgo=true to enable CGO support
 
 
 ```
@@ -241,7 +274,7 @@ k6build server [flags]
 
 ```
 
-# start the build server using a custom catalog
+# start the build server using a custom local catalog
 k6build server -c /path/to/catalog.json
 
 # start the server the build server using a custom GOPROXY
@@ -251,9 +284,11 @@ k6build server -e GOPROXY=http://localhost:80
 ## Flags
 
 ```
-      --cache-url string     cache server url (default "http://localhost:9000")
+      --allow-prereleases    allow building pre-releases.
+      --cache-url string     cache server url (default "http://localhost:9000/cache")
   -c, --catalog string       dependencies catalog. Can be path to a local file or an URL (default "https://registry.k6.io/catalog.json")
   -g, --copy-go-env          copy go environment (default true)
+      --enable-cgo           enable CGO for building binaries.
   -e, --env stringToString   build environment variables (default [])
   -h, --help                 help for server
   -l, --log-level string     log level (default "INFO")
@@ -263,6 +298,6 @@ k6build server -e GOPROXY=http://localhost:80
 
 ## SEE ALSO
 
-* [k6build](#k6build)	 - Build k6 with various builders.
+* [k6build](#k6build)	 - Build custom k6 binaries with extensions
 
 <!-- #endregion cli -->
