@@ -10,9 +10,9 @@ import (
 
 // BuildRequest defines a request to the build service
 type BuildRequest struct {
-	K6Constrains string               `json:"k6:omitempty"`
+	K6Constrains string               `json:"k6,omitempty"`
 	Dependencies []k6build.Dependency `json:"dependencies,omitempty"`
-	Platform     string               `json:"platformomitempty"`
+	Platform     string               `json:"platform,omitempty"`
 }
 
 // String returns a text serialization of the BuildRequest
