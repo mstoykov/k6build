@@ -108,7 +108,7 @@ func New() *cobra.Command { //nolint:funlen
 		k6catalog.DefaultCatalogURL,
 		"dependencies catalog. Can be path to a local file or an URL",
 	)
-	cmd.Flags().StringVar(&config.CacheURL, "cache-url", "http://localhost:9000", "cache server url")
+	cmd.Flags().StringVar(&config.CacheURL, "cache-url", "http://localhost:9000/cache", "cache server url")
 	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
 	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")
