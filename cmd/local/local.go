@@ -11,6 +11,7 @@ import (
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/local"
+	"github.com/grafana/k6catalog"
 
 	"github.com/spf13/cobra"
 )
@@ -127,7 +128,7 @@ func New() *cobra.Command { //nolint:funlen
 	cmd.Flags().StringVarP(&k6, "k6", "k", "*", "k6 version constrains")
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
 	_ = cmd.MarkFlagRequired("platform")
-	cmd.Flags().StringVarP(&config.Catalog, "catalog", "c", "catalog.json", "dependencies catalog")
+	cmd.Flags().StringVarP(&config.Catalog, "catalog", "c", k6catalog.DefaultCatalogURL, "dependencies catalog")
 	cmd.Flags().StringVarP(&config.CacheDir, "cache-dir", "f", "/tmp/buildservice", "cache dir")
 	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
