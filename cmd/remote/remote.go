@@ -128,7 +128,7 @@ func New() *cobra.Command {
 	cmd.Flags().StringVarP(&k6, "k6", "k", "*", "k6 version constrains")
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "path to download the custom binary as an executable."+
-		" If not specified, the artifact is not downloaded.")
+		"\nIf not specified, the artifact is not downloaded.")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "don't print artifact's details")
 
 	return cmd

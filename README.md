@@ -1,6 +1,30 @@
 # k6build
 
-k6build builds custom k6 binaries with extensions
+k6build builds custom k6 binaries with extensions.
+
+
+## API
+
+`k6build` defines an [API](build.go) for building custom k6 binaries.
+
+The API returns the metadata of the custom binary, including an URL for downloading it,
+but does not return the binary itself.
+
+The request for building a binary specifies the target platform (required) and the dependencies,
+including k6.
+
+The dependencies specify the import path (as used in the k6 script) and the semantic version 
+constrains.
+
+Dependencies are mapped by a catalog to the corresponding go module that implements it. The catalog
+also defines the available versions.
+
+If a dependency doesn't specify a constrains, the latest version (according to the catalog) is used.
+
+See [k6catalog](http://github.com/grafana/k6catalog) for more details on defining a catalog.
+
+The default catalog is defined at https://registry.k6.io/catalog.json
+
 
 ## Usage scenarios
 
@@ -211,7 +235,8 @@ Extensions:
   -d, --dependency stringArray   list of dependencies in form package:constrains
   -h, --help                     help for remote
   -k, --k6 string                k6 version constrains (default "*")
-  -o, --output string            path to download the custom binary as an executable. If not specified, the artifact is not downloaded.
+  -o, --output string            path to download the custom binary as an executable.
+                                 If not specified, the artifact is not downloaded.
   -p, --platform string          target platform (default GOOS/GOARCH)
   -q, --quiet                    don't print artifact's details
   -s, --server string            url for build server (default "http://localhost:8000")
@@ -231,35 +256,37 @@ k6 build service
 
 Starts a k6build server
 
-The server exposes an API that can be used by clients for building artifacts.
-The API returns the metadata of the build artifact, including an URL for downloading it.
+The server exposes an API for building custom k6 binaries.
+
+The API returns the metadata of the custom binary, including an URL for downloading it,
+but does not return the binary itself.
 
 For example
 
-curl http://localhost:8000/build/ -d \
-'{
-   "k6":"v0.50.0",
-   "dependencies":[
-       {
-        "name":"k6/x/kubernetes",
-	"constraints":">v0.8.0"
-        }
-    ],
-    "platform":"linux/amd64"
-}'
+	curl http://localhost:8000/build/ -d \
+	'{
+	  "k6":"v0.50.0",
+	  "dependencies":[
+	    {
+		"name":"k6/x/kubernetes",
+		"constraints":">v0.8.0"
+	    }
+	  ],
+	  "platform":"linux/amd64"
+	}' | jq .
 
-{
-  "artifact": {
-    "id": "5a241ba6ff643075caadbd06d5a326e5e74f6f10",
-    "url": "http://localhost:9000/cache/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
-    "dependencies": {
-      "k6": "v0.50.0",
-      "k6/x/kubernetes": "v0.10.0"
-    },
-    "platform": "linux/amd64",
-    "checksum": "bfdf51ec9279e6d7f91df0a342d0c90ab4990ff1fb0215938505a6894edaf913"
-  }
-}
+	{
+	  "artifact": {
+	  "id": "5a241ba6ff643075caadbd06d5a326e5e74f6f10",
+	  "url": "http://localhost:9000/cache/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
+	  "dependencies": {
+	    "k6": "v0.50.0",
+	    "k6/x/kubernetes": "v0.10.0"
+	  },
+	  "platform": "linux/amd64",
+	  "checksum": "bfdf51ec9279e6d7f91df0a342d0c90ab4990ff1fb0215938505a6894edaf913"
+	  }
+	}
 
 Note: The build server does not support CGO_ENABLE when building binaries
       due to this issue: https://github.com/grafana/k6build/issues/37
@@ -277,8 +304,9 @@ k6build server [flags]
 # start the build server using a custom local catalog
 k6build server -c /path/to/catalog.json
 
-# start the server the build server using a custom GOPROXY
+# start the build server using a custom GOPROXY
 k6build server -e GOPROXY=http://localhost:80
+
 ```
 
 ## Flags
@@ -286,7 +314,8 @@ k6build server -e GOPROXY=http://localhost:80
 ```
       --allow-prereleases    allow building pre-releases.
       --cache-url string     cache server url (default "http://localhost:9000/cache")
-  -c, --catalog string       dependencies catalog. Can be path to a local file or an URL (default "https://registry.k6.io/catalog.json")
+  -c, --catalog string       dependencies catalog. Can be path to a local file or an URL.
+                              (default "https://registry.k6.io/catalog.json")
   -g, --copy-go-env          copy go environment (default true)
       --enable-cgo           enable CGO for building binaries.
   -e, --env stringToString   build environment variables (default [])
