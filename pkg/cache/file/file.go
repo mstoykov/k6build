@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/grafana/k6build/pkg/cache"
 	"github.com/grafana/k6build/pkg/util"
@@ -19,7 +20,8 @@ import (
 
 // Cache a Cache backed by a file system
 type Cache struct {
-	dir string
+	dir     string
+	mutexes sync.Map
 }
 
 // NewTempFileCache creates a file cache using a temporary file
@@ -49,6 +51,10 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	if strings.Contains(id, "/") {
 		return cache.Object{}, fmt.Errorf("%w id cannot contain '/'", cache.ErrCreatingObject)
 	}
+
+	// prevent concurrent modification of an object
+	unlock := f.lockObject(id)
+	defer unlock()
 
 	objectDir := filepath.Join(f.dir, id)
 
@@ -162,4 +168,19 @@ func (f *Cache) sanitizePath(path string) (string, error) {
 	}
 
 	return path, nil
+}
+
+// lockObject obtains a mutex used to prevent concurrent builds of the same artifact and
+// returns a function that will unlock the mutex associated to the given id in the cache.
+// The lock is also removed from the map. Subsequent calls will get another lock on the same
+// id but this is safe as the object should already be in the cache and no further builds are needed.
+func (f *Cache) lockObject(id string) func() {
+	value, _ := f.mutexes.LoadOrStore(id, &sync.Mutex{})
+	mtx, _ := value.(*sync.Mutex)
+	mtx.Lock()
+
+	return func() {
+		f.mutexes.Delete(id)
+		mtx.Unlock()
+	}
 }
