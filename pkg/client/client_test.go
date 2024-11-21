@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,10 +17,30 @@ import (
 type testSrv struct {
 	status   int
 	response api.BuildResponse
+	auth     string
+	authType string
+	headers  map[string]string
 }
 
 func (t testSrv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
+
+	// validate authorization
+	if t.auth != "" {
+		authHeader := fmt.Sprintf("%s %s", t.authType, t.auth)
+		if r.Header.Get("Authorization") != authHeader {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// validate headers
+	for h, v := range t.headers {
+		if r.Header.Get(h) != v {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
 
 	// validate request
 	req := api.BuildRequest{}
@@ -47,6 +68,9 @@ func TestRemote(t *testing.T) {
 
 	testCases := []struct {
 		title     string
+		headers   map[string]string
+		auth      string
+		authType  string
 		status    int
 		resp      api.BuildResponse
 		expectErr error
@@ -77,6 +101,29 @@ func TestRemote(t *testing.T) {
 			},
 			expectErr: ErrBuildFailed,
 		},
+		{
+			title:     "auth header",
+			auth:      "token",
+			authType:  "Bearer",
+			status:    http.StatusOK,
+			resp:      api.BuildResponse{},
+			expectErr: nil,
+		},
+		{
+			title:     "failed auth",
+			status:    http.StatusUnauthorized,
+			resp:      api.BuildResponse{},
+			expectErr: ErrRequestFailed,
+		},
+		{
+			title: "custom headers",
+			headers: map[string]string{
+				"Custom-Header": "Custom-Value",
+			},
+			status:    http.StatusOK,
+			resp:      api.BuildResponse{},
+			expectErr: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -87,11 +134,17 @@ func TestRemote(t *testing.T) {
 			srv := httptest.NewServer(testSrv{
 				status:   tc.status,
 				response: tc.resp,
+				auth:     tc.auth,
+				authType: tc.authType,
+				headers:  tc.headers,
 			})
 
 			client, err := NewBuildServiceClient(
 				BuildServiceClientConfig{
-					URL: srv.URL,
+					URL:               srv.URL,
+					Headers:           tc.headers,
+					Authorization:     tc.auth,
+					AuthorizationType: tc.authType,
 				},
 			)
 			if err != nil {
