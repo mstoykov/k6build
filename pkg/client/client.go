@@ -14,6 +14,10 @@ import (
 	"github.com/grafana/k6build/pkg/api"
 )
 
+const (
+	defaultAuthType = "Bearer"
+)
+
 var (
 	ErrBuildFailed   = errors.New("build failed")   //nolint:revive
 	ErrRequestFailed = errors.New("request failed") //nolint:revive
@@ -21,24 +25,39 @@ var (
 
 // BuildServiceClientConfig defines the configuration for accessing a remote build service
 type BuildServiceClientConfig struct {
+	// URL to build service
 	URL string
+	// Authorization credentials passed in the Authorization: <type> <credentials> header
+	// See AuthorizationType
+	Authorization string
+	// AuthorizationType type of credentials in the Authorization: <type> <credentials> header
+	// For example, "Bearer", "Token", "Basic". Defaults to "Bearer"
+	AuthorizationType string
+	// Headers custom request headers
+	Headers map[string]string
 }
 
 // NewBuildServiceClient returns a new client for a remote build service
 func NewBuildServiceClient(config BuildServiceClientConfig) (k6build.BuildService, error) {
 	return &BuildClient{
-		srv: config.URL,
+		srvURL:   config.URL,
+		auth:     config.Authorization,
+		authType: config.AuthorizationType,
+		headers:  config.Headers,
 	}, nil
 }
 
 // BuildClient defines a client of a build service
 type BuildClient struct {
-	srv string
+	srvURL   string
+	authType string
+	auth     string
+	headers  map[string]string
 }
 
 // Build request building an artidact to a build service
 func (r *BuildClient) Build(
-	_ context.Context,
+	ctx context.Context,
 	platform string,
 	k6Constrains string,
 	deps []k6build.Dependency,
@@ -54,12 +73,33 @@ func (r *BuildClient) Build(
 		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
 	}
 
-	url, err := url.Parse(r.srv)
+	url, err := url.Parse(r.srvURL)
 	if err != nil {
 		return k6build.Artifact{}, fmt.Errorf("invalid server %w", err)
 	}
 	url.Path = "/build/"
-	resp, err := http.Post(url.String(), "application/json", marshaled) //nolint:noctx
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), marshaled)
+	if err != nil {
+		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	// add authorization header "Authorization: <type> <auth>"
+	if r.auth != "" {
+		authType := r.authType
+		if authType == "" {
+			authType = defaultAuthType
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("%s %s", authType, r.auth))
+	}
+
+	// add custom headers
+	for h, v := range r.headers {
+		req.Header.Add(h, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,31 +15,83 @@ import (
 )
 
 type testSrv struct {
-	status   int
-	response api.BuildResponse
+	handlers []requestHandler
+}
+
+// process request and return a boolean indicating if request should be passed to the next handler in the chain
+type requestHandler func(w http.ResponseWriter, r *http.Request) bool
+
+func withValidateRequest() requestHandler {
+	return func(w http.ResponseWriter, r *http.Request) bool {
+		req := api.BuildRequest{}
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return false
+		}
+
+		if req.K6Constrains == "" || req.Platform == "" || len(req.Dependencies) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			return false
+		}
+
+		return true
+	}
+}
+
+func withAuthorizationCheck(authType string, auth string) requestHandler {
+	return func(w http.ResponseWriter, r *http.Request) bool {
+		authHeader := fmt.Sprintf("%s %s", authType, auth)
+		if r.Header.Get("Authorization") != authHeader {
+			w.WriteHeader(http.StatusUnauthorized)
+			return false
+		}
+		return true
+	}
+}
+
+func withHeadersCheck(headers map[string]string) requestHandler {
+	return func(w http.ResponseWriter, r *http.Request) bool {
+		for h, v := range headers {
+			if r.Header.Get(h) != v {
+				w.WriteHeader(http.StatusBadRequest)
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func withResponse(status int, response api.BuildResponse) requestHandler {
+	return func(w http.ResponseWriter, _ *http.Request) bool {
+		resp := &bytes.Buffer{}
+		err := json.NewEncoder(resp).Encode(response)
+		if err != nil {
+			panic("unexpected error encoding response")
+		}
+
+		w.WriteHeader(status)
+		_, _ = w.Write(resp.Bytes())
+
+		return false
+	}
 }
 
 func (t testSrv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
-	// validate request
-	req := api.BuildRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	// check headers
+	for _, check := range t.handlers {
+		if !check(w, r) {
+			return
+		}
 	}
 
-	// send canned response
+	// by default return ok and an empty artifact
 	resp := &bytes.Buffer{}
-	err = json.NewEncoder(resp).Encode(t.response)
-	if err != nil {
-		// set uncommon status code to signal something unexpected happened
-		w.WriteHeader(http.StatusTeapot)
-		return
-	}
+	_ = json.NewEncoder(resp).Encode(api.BuildResponse{Artifact: k6build.Artifact{}}) //nolint:errchkjson
 
-	w.WriteHeader(t.status)
+	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(resp.Bytes())
 }
 
@@ -47,35 +100,59 @@ func TestRemote(t *testing.T) {
 
 	testCases := []struct {
 		title     string
-		status    int
-		resp      api.BuildResponse
+		headers   map[string]string
+		auth      string
+		authType  string
+		handlers  []requestHandler
 		expectErr error
 	}{
 		{
-			title:  "normal build",
-			status: http.StatusOK,
-			resp: api.BuildResponse{
-				Error:    "",
-				Artifact: k6build.Artifact{},
+			title: "normal build",
+			handlers: []requestHandler{
+				withValidateRequest(),
 			},
 		},
 		{
-			title:  "request failed",
-			status: http.StatusInternalServerError,
-			resp: api.BuildResponse{
-				Error:    "request failed",
-				Artifact: k6build.Artifact{},
+			title: "build request failed",
+			handlers: []requestHandler{
+				withResponse(http.StatusOK, api.BuildResponse{Error: ErrBuildFailed.Error()}),
+			},
+			expectErr: ErrBuildFailed,
+		},
+		{
+			title:    "auth header",
+			auth:     "token",
+			authType: "Bearer",
+			handlers: []requestHandler{
+				withAuthorizationCheck("Bearer", "token"),
+			},
+			expectErr: nil,
+		},
+		{
+			title:    "with default auth type",
+			auth:     "token",
+			authType: "",
+			handlers: []requestHandler{
+				withAuthorizationCheck("Bearer", "token"),
+			},
+			expectErr: nil,
+		},
+		{
+			title: "failed auth",
+			handlers: []requestHandler{
+				withResponse(http.StatusUnauthorized, api.BuildResponse{Error: "Authorization Required"}),
 			},
 			expectErr: ErrRequestFailed,
 		},
 		{
-			title:  "failed build",
-			status: http.StatusOK,
-			resp: api.BuildResponse{
-				Error:    "failed build",
-				Artifact: k6build.Artifact{},
+			title: "custom headers",
+			headers: map[string]string{
+				"Custom-Header": "Custom-Value",
 			},
-			expectErr: ErrBuildFailed,
+			handlers: []requestHandler{
+				withHeadersCheck(map[string]string{"Custom-Header": "Custom-Value"}),
+			},
+			expectErr: nil,
 		},
 	}
 
@@ -85,13 +162,17 @@ func TestRemote(t *testing.T) {
 			t.Parallel()
 
 			srv := httptest.NewServer(testSrv{
-				status:   tc.status,
-				response: tc.resp,
+				handlers: tc.handlers,
 			})
+
+			defer srv.Close()
 
 			client, err := NewBuildServiceClient(
 				BuildServiceClientConfig{
-					URL: srv.URL,
+					URL:               srv.URL,
+					Headers:           tc.headers,
+					Authorization:     tc.auth,
+					AuthorizationType: tc.authType,
 				},
 			)
 			if err != nil {
