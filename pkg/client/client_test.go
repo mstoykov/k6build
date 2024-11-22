@@ -115,9 +115,9 @@ func TestRemote(t *testing.T) {
 		{
 			title: "build request failed",
 			handlers: []requestHandler{
-				withResponse(http.StatusOK, api.BuildResponse{Error: ErrBuildFailed.Error()}),
+				withResponse(http.StatusOK, api.BuildResponse{Error: k6build.NewError(api.ErrBuildFailed, nil)}),
 			},
-			expectErr: ErrBuildFailed,
+			expectErr: api.ErrBuildFailed,
 		},
 		{
 			title:    "auth header",
@@ -140,9 +140,9 @@ func TestRemote(t *testing.T) {
 		{
 			title: "failed auth",
 			handlers: []requestHandler{
-				withResponse(http.StatusUnauthorized, api.BuildResponse{Error: "Authorization Required"}),
+				withResponse(http.StatusUnauthorized, api.BuildResponse{Error: k6build.NewError(api.ErrRequestFailed, errors.New("unauthorized"))}),
 			},
-			expectErr: ErrRequestFailed,
+			expectErr: api.ErrRequestFailed,
 		},
 		{
 			title: "custom headers",

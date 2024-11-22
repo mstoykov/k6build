@@ -208,13 +208,13 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	}
 
 	if !errors.Is(err, cache.ErrObjectNotFound) {
-		return k6build.Artifact{}, fmt.Errorf("accessing artifact %w", err)
+		return k6build.Artifact{}, fmt.Errorf("accessing artifact: %w", err)
 	}
 
 	artifactBuffer := &bytes.Buffer{}
 	buildInfo, err := b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
 	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("building artifact  %w", err)
+		return k6build.Artifact{}, fmt.Errorf("building artifact: %w", err)
 	}
 
 	// if this is a prerelease, we must use the actual version built
@@ -225,7 +225,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 
 	artifactObject, err = b.cache.Store(ctx, id, artifactBuffer)
 	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("creating object  %w", err)
+		return k6build.Artifact{}, fmt.Errorf("creating object:  %w", err)
 	}
 
 	return k6build.Artifact{
