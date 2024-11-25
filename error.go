@@ -6,9 +6,6 @@ import (
 	"fmt"
 )
 
-// ErrReasonUnknown signals the reason for an APIError in unknown
-var ErrReasonUnknown = errors.New("reason unknown")
-
 // Error represents an error returned by the build service
 // This custom error type facilitates extracting the reason of an error
 // by using errors.Unwrap method.
@@ -24,7 +21,11 @@ type Error struct {
 
 // Error returns the Error as a string
 func (e *Error) Error() string {
-	return fmt.Sprintf("%s: %s", e.Err, e.Reason)
+	reason := ""
+	if e.Reason != nil {
+		reason = fmt.Sprintf(": %s", e.Reason)
+	}
+	return fmt.Sprintf("%s%s", e.Err, reason)
 }
 
 // Is returns true if the target error is the same as the Error or its reason
@@ -63,12 +64,16 @@ func (e *Error) Unwrap() error {
 
 // MarshalJSON implements the json.Marshaler interface for the Error type
 func (e *Error) MarshalJSON() ([]byte, error) {
+	reason := ""
+	if e.Reason != nil {
+		reason = e.Reason.Error()
+	}
 	return json.Marshal(&struct {
 		Err    string `json:"error,omitempty"`
 		Reason string `json:"reason,omitempty"`
 	}{
 		Err:    e.Err.Error(),
-		Reason: e.Reason.Error(),
+		Reason: reason,
 	})
 }
 
@@ -91,7 +96,7 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 // NewError creates an Error from an error and a reason
 // If the reason is nil, ErrReasonUnknown is used
 func NewError(err error, reasons ...error) *Error {
-	reason := ErrReasonUnknown
+	var reason error
 	if len(reasons) > 0 {
 		reason = NewError(reasons[0], reasons[1:]...)
 	}
