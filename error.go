@@ -90,9 +90,10 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 
 // NewError creates an Error from an error and a reason
 // If the reason is nil, ErrReasonUnknown is used
-func NewError(err error, reason error) *Error {
-	if reason == nil {
-		reason = ErrReasonUnknown
+func NewError(err error, reasons ...error) *Error {
+	reason := ErrReasonUnknown
+	if len(reasons) > 0 {
+		reason = NewError(reasons[0], reasons[1:]...)
 	}
 	return &Error{
 		Err:    err,
