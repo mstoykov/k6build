@@ -74,7 +74,7 @@ func TestAPIServer(t *testing.T) {
 			title:    "build error",
 			build:    buildFunction(buildErr),
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
-			status:   http.StatusBadRequest,
+			status:   http.StatusOK,
 			artifact: k6build.Artifact{},
 			err:      api.ErrBuildFailed,
 		},

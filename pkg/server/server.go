@@ -73,7 +73,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		req.Dependencies,
 	)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusOK)
 		resp.Error = k6build.NewError(api.ErrBuildFailed, err)
 		return
 	}
