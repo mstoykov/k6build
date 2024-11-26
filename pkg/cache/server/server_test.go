@@ -101,7 +101,7 @@ func TestCacheServerGet(t *testing.T) {
 		title    string
 		id       string
 		status   int
-		epectErr string
+		epectErr error
 	}{
 		{
 			title:  "return object",
@@ -140,7 +140,7 @@ func TestCacheServerGet(t *testing.T) {
 			}
 
 			if tc.status != http.StatusOK {
-				if cacheResponse.Error == "" {
+				if cacheResponse.Error == nil {
 					t.Fatalf("expected error message not none")
 				}
 				return
@@ -208,7 +208,7 @@ func TestCacheServerStore(t *testing.T) {
 			}
 
 			if tc.status != http.StatusOK {
-				if cacheResponse.Error == "" {
+				if cacheResponse.Error == nil {
 					t.Fatalf("expected error message not none")
 				}
 				return

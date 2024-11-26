@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/cache"
 	"github.com/grafana/k6build/pkg/cache/api"
 )
@@ -58,7 +59,7 @@ func TestCacheClientGet(t *testing.T) {
 			title:  "normal get",
 			status: http.StatusOK,
 			resp: &api.CacheResponse{
-				Error:  "",
+				Error:  nil,
 				Object: cache.Object{},
 			},
 		},
@@ -72,7 +73,7 @@ func TestCacheClientGet(t *testing.T) {
 			title:  "error accessing object",
 			status: http.StatusInternalServerError,
 			resp: &api.CacheResponse{
-				Error:  "Error accessing object",
+				Error:  k6build.NewError(cache.ErrAccessingObject),
 				Object: cache.Object{},
 			},
 			expectErr: ErrRequestFailed,
@@ -112,7 +113,7 @@ func TestCacheClientStore(t *testing.T) {
 			title:  "normal response",
 			status: http.StatusOK,
 			resp: &api.CacheResponse{
-				Error:  "",
+				Error:  nil,
 				Object: cache.Object{},
 			},
 		},
@@ -120,7 +121,7 @@ func TestCacheClientStore(t *testing.T) {
 			title:  "error creating object",
 			status: http.StatusInternalServerError,
 			resp: &api.CacheResponse{
-				Error:  "Error creating object",
+				Error:  k6build.NewError(cache.ErrCreatingObject),
 				Object: cache.Object{},
 			},
 			expectErr: ErrRequestFailed,
