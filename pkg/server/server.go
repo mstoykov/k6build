@@ -4,7 +4,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -51,8 +50,8 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// ensure errors are reported and logged
 	defer func() {
-		if resp.Error != "" {
-			a.log.Error(resp.Error)
+		if resp.Error != nil {
+			a.log.Error(resp.Error.Error())
 			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		}
 	}()
@@ -61,7 +60,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = fmt.Sprintf("invalid request: %s", err.Error())
+		resp.Error = k6build.NewError(api.ErrInvalidRequest, err)
 		return
 	}
 
@@ -74,8 +73,8 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		req.Dependencies,
 	)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = fmt.Sprintf("building artifact: %s", err.Error())
+		w.WriteHeader(http.StatusOK)
+		resp.Error = k6build.NewError(api.ErrBuildFailed, err)
 		return
 	}
 

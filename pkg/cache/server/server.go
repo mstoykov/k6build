@@ -10,11 +10,10 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/cache"
 	"github.com/grafana/k6build/pkg/cache/api"
 )
-
-var ErrInvalidRequest = errors.New("invalid request") //nolint:revive
 
 // CacheServer implements an http server that handles cache requests
 type CacheServer struct {
@@ -66,8 +65,8 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = ErrInvalidRequest.Error()
-		s.log.Error(resp.Error)
+		resp.Error = k6build.NewError(api.ErrInvalidRequest, fmt.Errorf("object id is required"))
+		s.log.Error(resp.Error.Error())
 		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		return
 	}
@@ -81,7 +80,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 			s.log.Error(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		resp.Error = err.Error()
+		resp.Error = k6build.NewError(api.ErrCacheAccess, err)
 		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 
 		return
@@ -106,8 +105,8 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 
 	// ensure errors are reported and logged
 	defer func() {
-		if resp.Error != "" {
-			s.log.Error(resp.Error)
+		if resp.Error != nil {
+			s.log.Error(resp.Error.Error())
 			_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		}
 	}()
@@ -115,14 +114,14 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = ErrInvalidRequest.Error()
+		resp.Error = k6build.NewError(api.ErrInvalidRequest, fmt.Errorf("object id is required"))
 		return
 	}
 
 	object, err := s.cache.Store(context.Background(), id, r.Body) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = err.Error()
+		resp.Error = k6build.NewError(api.ErrCacheAccess, err)
 		return
 	}
 

@@ -14,13 +14,11 @@ import (
 	"github.com/grafana/k6build/pkg/api"
 )
 
+// ErrInvalidConfiguration signals an error in the configuration
+var ErrInvalidConfiguration = errors.New("invalid configuration")
+
 const (
 	defaultAuthType = "Bearer"
-)
-
-var (
-	ErrBuildFailed   = errors.New("build failed")   //nolint:revive
-	ErrRequestFailed = errors.New("request failed") //nolint:revive
 )
 
 // BuildServiceClientConfig defines the configuration for accessing a remote build service
@@ -39,6 +37,9 @@ type BuildServiceClientConfig struct {
 
 // NewBuildServiceClient returns a new client for a remote build service
 func NewBuildServiceClient(config BuildServiceClientConfig) (k6build.BuildService, error) {
+	if config.URL == "" {
+		return nil, ErrInvalidConfiguration
+	}
 	return &BuildClient{
 		srvURL:   config.URL,
 		auth:     config.Authorization,
@@ -55,7 +56,11 @@ type BuildClient struct {
 	headers  map[string]string
 }
 
-// Build request building an artidact to a build service
+// Build request building an artifact to a build service
+// The build service is expected to return a k6build.Artifact
+// In case of error, the returned error is expected to match any of the errors
+// defined in the api package and calling errors.Unwrap(err) will provide
+// the cause, if available.
 func (r *BuildClient) Build(
 	ctx context.Context,
 	platform string,
@@ -70,7 +75,7 @@ func (r *BuildClient) Build(
 	marshaled := &bytes.Buffer{}
 	err := json.NewEncoder(marshaled).Encode(buildRequest)
 	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewError(api.ErrInvalidRequest, err)
 	}
 
 	url, err := url.Parse(r.srvURL)
@@ -81,7 +86,7 @@ func (r *BuildClient) Build(
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), marshaled)
 	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -101,7 +106,7 @@ func (r *BuildClient) Build(
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -110,15 +115,21 @@ func (r *BuildClient) Build(
 	buildResponse := api.BuildResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&buildResponse)
 	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return k6build.Artifact{}, fmt.Errorf("%w: %s", ErrRequestFailed, buildResponse.Error)
+		// if an error occurred (e.g. internal server error) the Error may not be available
+		if buildResponse.Error == nil {
+			return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, errors.New(resp.Status))
+		}
+
+		// we expect the Error to have an api.Error we we don't wrap it again
+		return k6build.Artifact{}, buildResponse.Error
 	}
 
-	if buildResponse.Error != "" {
-		return k6build.Artifact{}, fmt.Errorf("%w: %s", ErrBuildFailed, buildResponse.Error)
+	if buildResponse.Error != nil {
+		return k6build.Artifact{}, buildResponse.Error
 	}
 
 	return buildResponse.Artifact, nil

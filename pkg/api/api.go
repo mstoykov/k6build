@@ -3,9 +3,20 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/grafana/k6build"
+)
+
+var (
+	// ErrInvalidRequest signals the request could not be processed
+	// due to erroneous parameters
+	ErrInvalidRequest = errors.New("invalid request")
+	// ErrRequestFailed signals the request failed, probably due to a network error
+	ErrRequestFailed = errors.New("request failed")
+	// ErrBuildFailed signals the build process failed
+	ErrBuildFailed = errors.New("build failed")
 )
 
 // BuildRequest defines a request to the build service
@@ -28,6 +39,10 @@ func (r BuildRequest) String() string {
 
 // BuildResponse defines the response for a BuildRequest
 type BuildResponse struct {
-	Error    string           `json:"error,omitempty"`
+	// If not empty an error occurred processing the request
+	// This Error can be compared to the errors defined in this package using errors.Is
+	// to know the type of error, and use Unwrap to obtain its cause if available.
+	Error *k6build.Error `json:"error,omitempty"`
+	// Artifact metadata. If an error occurred, content is undefined
 	Artifact k6build.Artifact `json:"artifact,omitempty"`
 }

@@ -2,7 +2,6 @@
 package local
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/spf13/cobra"
 )
-
-var ErrTargetPlatformUndefined = errors.New("target platform is required") //nolint:revive
 
 const (
 	long = `

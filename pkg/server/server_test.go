@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/grafana/k6build"
@@ -51,14 +51,6 @@ func buildErr(
 	return k6build.Artifact{}, k6build.ErrBuildFailed
 }
 
-func expectedError(expected string, actual string) bool {
-	if expected != "" {
-		return strings.Contains(actual, expected)
-	}
-
-	return actual == ""
-}
-
 func TestAPIServer(t *testing.T) {
 	t.Parallel()
 
@@ -67,7 +59,7 @@ func TestAPIServer(t *testing.T) {
 		build    buildFunction
 		req      []byte
 		status   int
-		err      string
+		err      error
 		artifact k6build.Artifact
 	}{
 		{
@@ -76,15 +68,15 @@ func TestAPIServer(t *testing.T) {
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
 			status:   http.StatusOK,
 			artifact: k6build.Artifact{},
-			err:      "",
+			err:      nil,
 		},
 		{
 			title:    "build error",
 			build:    buildFunction(buildErr),
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
-			status:   http.StatusBadRequest,
+			status:   http.StatusOK,
 			artifact: k6build.Artifact{},
-			err:      k6build.ErrBuildFailed.Error(),
+			err:      api.ErrBuildFailed,
 		},
 		{
 			title:    "invalid request",
@@ -92,7 +84,7 @@ func TestAPIServer(t *testing.T) {
 			req:      []byte(""),
 			status:   http.StatusBadRequest,
 			artifact: k6build.Artifact{},
-			err:      "invalid request",
+			err:      api.ErrInvalidRequest,
 		},
 	}
 
@@ -127,7 +119,7 @@ func TestAPIServer(t *testing.T) {
 				t.Fatalf("decoding response %v", err)
 			}
 
-			if !expectedError(tc.err, buildResponse.Error) {
+			if tc.err != nil && !errors.Is(buildResponse.Error, tc.err) {
 				t.Fatalf("expected error: %q got %q", tc.err, buildResponse.Error)
 			}
 		})
