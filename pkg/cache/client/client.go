@@ -15,14 +15,8 @@ import (
 	"github.com/grafana/k6build/pkg/cache/api"
 )
 
-var (
-	ErrAccessingServer = errors.New("making request")        //nolint:revive
-	ErrInvalidConfig   = errors.New("invalid configuration") //nolint:revive
-	ErrInvalidRequest  = errors.New("invalid request")       //nolint:revive
-	ErrInvalidResponse = errors.New("invalid response")      //nolint:revive
-	ErrRequestFailed   = errors.New("request failed")        //nolint:revive
-
-)
+// ErrInvalidConfig signals an error with the client configuration
+var ErrInvalidConfig = errors.New("invalid configuration")
 
 // CacheClientConfig defines the configuration for accessing a remote cache service
 type CacheClientConfig struct {
@@ -52,7 +46,7 @@ func (c *CacheClient) Get(_ context.Context, id string) (cache.Object, error) {
 	// TODO: use http.Request
 	resp, err := http.Get(url) //nolint:gosec,noctx
 	if err != nil {
-		return cache.Object{}, k6build.NewError(ErrAccessingServer, err)
+		return cache.Object{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -62,17 +56,17 @@ func (c *CacheClient) Get(_ context.Context, id string) (cache.Object, error) {
 		if resp.StatusCode == http.StatusNotFound {
 			return cache.Object{}, cache.ErrObjectNotFound
 		}
-		return cache.Object{}, k6build.NewError(ErrRequestFailed, fmt.Errorf("status %s", resp.Status))
+		return cache.Object{}, k6build.NewError(api.ErrRequestFailed, fmt.Errorf("status %s", resp.Status))
 	}
 
 	cacheResponse := api.CacheResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 	if err != nil {
-		return cache.Object{}, k6build.NewError(ErrInvalidResponse, err)
+		return cache.Object{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 
 	if cacheResponse.Error != nil {
-		return cache.Object{}, k6build.NewError(ErrRequestFailed, cacheResponse.Error)
+		return cache.Object{}, cacheResponse.Error
 	}
 
 	return cacheResponse.Object, nil
@@ -87,23 +81,23 @@ func (c *CacheClient) Store(_ context.Context, id string, content io.Reader) (ca
 		content,
 	)
 	if err != nil {
-		return cache.Object{}, k6build.NewError(ErrAccessingServer, err)
+		return cache.Object{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return cache.Object{}, k6build.NewError(ErrRequestFailed, fmt.Errorf("status %s", resp.Status))
+		return cache.Object{}, k6build.NewError(api.ErrRequestFailed, fmt.Errorf("status %s", resp.Status))
 	}
 	cacheResponse := api.CacheResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
 	if err != nil {
-		return cache.Object{}, k6build.NewError(ErrInvalidResponse, err)
+		return cache.Object{}, k6build.NewError(api.ErrRequestFailed, err)
 	}
 
 	if cacheResponse.Error != nil {
-		return cache.Object{}, k6build.NewError(ErrRequestFailed, cacheResponse.Error)
+		return cache.Object{}, cacheResponse.Error
 	}
 
 	return cacheResponse.Object, nil
@@ -113,11 +107,11 @@ func (c *CacheClient) Store(_ context.Context, id string, content io.Reader) (ca
 func (c *CacheClient) Download(_ context.Context, object cache.Object) (io.ReadCloser, error) {
 	resp, err := http.Get(object.URL) //nolint:noctx,bodyclose
 	if err != nil {
-		return nil, k6build.NewError(ErrAccessingServer, err)
+		return nil, k6build.NewError(api.ErrRequestFailed, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, k6build.NewError(ErrRequestFailed, fmt.Errorf("status %s", resp.Status))
+		return nil, k6build.NewError(api.ErrRequestFailed, fmt.Errorf("status %s", resp.Status))
 	}
 
 	return resp.Request.Body, nil
