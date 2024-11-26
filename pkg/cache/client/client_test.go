@@ -73,7 +73,7 @@ func TestCacheClientGet(t *testing.T) {
 			title:  "error accessing object",
 			status: http.StatusInternalServerError,
 			resp: &api.CacheResponse{
-				Error:  k6build.NewError(cache.ErrAccessingObject),
+				Error:  k6build.NewError(cache.ErrAccessingObject, nil),
 				Object: cache.Object{},
 			},
 			expectErr: ErrRequestFailed,
@@ -121,7 +121,7 @@ func TestCacheClientStore(t *testing.T) {
 			title:  "error creating object",
 			status: http.StatusInternalServerError,
 			resp: &api.CacheResponse{
-				Error:  k6build.NewError(cache.ErrCreatingObject),
+				Error:  k6build.NewError(cache.ErrCreatingObject, nil),
 				Object: cache.Object{},
 			},
 			expectErr: ErrRequestFailed,
