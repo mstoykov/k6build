@@ -246,7 +246,7 @@ func TestIdempotentBuild(t *testing.T) {
 
 // TestConcurrentBuilds tests that is sage to build the same artifact concurrently and that
 // concurrent builds of different artifacts are not affected.
-// The test uses a local test setup backed by a file cache.
+// The test uses a local test setup backed by a file object store.
 // Attempting to write the same artifact twice will return an error.
 func TestConcurrentBuilds(t *testing.T) {
 	t.Parallel()

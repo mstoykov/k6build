@@ -1,24 +1,24 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: cachesrv
+  name: storesrv
   labels:
-    app: cachesrv
+    app: storesrv
 spec:
   containers:
-  - name: cachesrv
+  - name: storesrv
     image: grafana/k6build
     imagePullPolicy: Never
-    command: ["k6build", "cache", "--log-level", "DEBUG", "--download-url", "http://cachesrv:9000/cache"]
+    command: ["k6build", "store", "--log-level", "DEBUG", "--download-url", "http://storesrv:9000/store"]
 
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: cachesrv
+  name: storesrv
 spec:
   selector:
-    app: cachesrv
+    app: storesrv
   type: LoadBalancer
   ports:
   - port: 9000
@@ -41,8 +41,8 @@ spec:
     - "--verbose"
     - "--log-level"
     - "DEBUG"
-    - "--cache-url"
-    - "http://cachesrv:9000/cache"
+    - "--store-url"
+    - "http://storesrv:9000/store"
     - "-e"
     - "CGO_ENABLED=1"
     - "--catalog"

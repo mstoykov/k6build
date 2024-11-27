@@ -56,14 +56,14 @@ configmap/k6build-catalog created
 
 ### Deploy service
 
-The [deployment/k6build.yaml](deployment/k6build.yaml) file contains the manifests for deploying as a service. It also creates a cache server to support the downloading of custom `k6` binaries.
+The [deployment/k6build.yaml](deployment/k6build.yaml) file contains the manifests for deploying as a service. It also creates an object store server to support the downloading of custom `k6` binaries.
 
 Deploy these components with the following command:
 
 ```
 kubectl apply -f deployment/k6build.yaml
-pod/cachesrv created
-service/cachesrv created
+pod/storesrv created
+service/storesrv created
 pod/k6build created
 service/k6build created
 ```
