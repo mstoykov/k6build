@@ -1,8 +1,11 @@
 package k6build
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -73,6 +76,63 @@ func Test_Error(t *testing.T) {
 				if !errors.Is(err, expected) {
 					t.Fatalf("expected %v got %v", expected, err)
 				}
+			}
+		})
+	}
+}
+
+func Test_JsonSerialization(t *testing.T) {
+	t.Parallel()
+
+	var (
+		err    = errors.New("error")
+		reason = errors.New("reason")
+		root   = errors.New("root")
+	)
+
+	testCases := []struct {
+		title  string
+		err    *Error
+		expect []byte
+	}{
+		{
+			title:  "error with cause",
+			err:    NewError(err, reason),
+			expect: []byte(`{"error":"error","reason":{"error":"reason"}}`),
+		},
+		{
+			title:  "error with nested causes",
+			err:    NewError(err, NewError(reason, root)),
+			expect: []byte(`{"error":"error","reason":{"error":"reason","reason":{"error":"root"}}}`),
+		},
+		{
+			title:  "error with nil cause",
+			err:    NewError(err, nil),
+			expect: []byte(`{"error":"error","reason":{"error":"reason unknown"}}`),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			marshalled, err := json.Marshal(tc.err)
+			if err != nil {
+				t.Fatalf("error marshaling: %v", err)
+			}
+
+			if !bytes.Equal(marshalled, tc.expect) {
+				t.Fatalf("failed unmarshaling expected %v got %v", string(tc.expect), string(marshalled))
+			}
+
+			unmashalled := &Error{}
+			err = json.Unmarshal(marshalled, unmashalled)
+			if err != nil {
+				t.Fatalf("error unmashaling: %v", err)
+			}
+
+			if !reflect.DeepEqual(tc.err, unmashalled) {
+				t.Fatalf("failed marshaling expected %v got %v", tc.err, unmashalled)
 			}
 		})
 	}

@@ -61,30 +61,52 @@ func (e *Error) Unwrap() error {
 	return e.Reason
 }
 
+type jsonError struct {
+	Err    string     `json:"error,omitempty"`
+	Reason *jsonError `json:"reason,omitempty"`
+}
+
+// returns a jsonError as a wrapped error
+func wrap(e *jsonError) error {
+	if e == nil {
+		return nil
+	}
+	err := errors.New(e.Err)
+	if e.Reason == nil {
+		return err
+	}
+
+	return NewError(err, wrap(e.Reason))
+}
+
+func unwrap(e error) *jsonError {
+	if e == nil {
+		return nil
+	}
+
+	err, ok := AsError(e)
+	if !ok {
+		return &jsonError{Err: e.Error()}
+	}
+
+	return &jsonError{Err: err.Err.Error(), Reason: unwrap(errors.Unwrap(err))}
+}
+
 // MarshalJSON implements the json.Marshaler interface for the Error type
 func (e *Error) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Err    string `json:"error,omitempty"`
-		Reason string `json:"reason,omitempty"`
-	}{
-		Err:    e.Err.Error(),
-		Reason: e.Reason.Error(),
-	})
+	return json.Marshal(unwrap(e))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface for the Error type
 func (e *Error) UnmarshalJSON(data []byte) error {
-	val := struct {
-		Err    string `json:"error,omitempty"`
-		Reason string `json:"reason,omitempty"`
-	}{}
+	val := jsonError{}
 
 	if err := json.Unmarshal(data, &val); err != nil {
 		return err
 	}
 
 	e.Err = errors.New(val.Err)
-	e.Reason = errors.New(val.Reason)
+	e.Reason = wrap(val.Reason)
 	return nil
 }
 
@@ -98,4 +120,13 @@ func NewError(err error, reason error) *Error {
 		Err:    err,
 		Reason: reason,
 	}
+}
+
+// AsError returns an error as an Error, if possible
+func AsError(e error) (*Error, bool) {
+	err := &Error{}
+	if !errors.As(e, &err) {
+		return nil, false
+	}
+	return err, true
 }
