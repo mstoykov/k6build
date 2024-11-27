@@ -60,7 +60,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = k6build.NewError(api.ErrInvalidRequest, err)
+		resp.Error = k6build.NewWrappedError(api.ErrInvalidRequest, err)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (a *APIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		w.WriteHeader(http.StatusOK)
-		resp.Error = k6build.NewError(api.ErrBuildFailed, err)
+		resp.Error = k6build.NewWrappedError(api.ErrBuildFailed, err)
 		return
 	}
 

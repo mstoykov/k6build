@@ -115,7 +115,7 @@ func TestRemote(t *testing.T) {
 		{
 			title: "build request failed",
 			handlers: []requestHandler{
-				withResponse(http.StatusOK, api.BuildResponse{Error: k6build.NewError(api.ErrBuildFailed, nil)}),
+				withResponse(http.StatusOK, api.BuildResponse{Error: k6build.NewWrappedError(api.ErrBuildFailed, nil)}),
 			},
 			expectErr: api.ErrBuildFailed,
 		},
@@ -140,7 +140,7 @@ func TestRemote(t *testing.T) {
 		{
 			title: "failed auth",
 			handlers: []requestHandler{
-				withResponse(http.StatusUnauthorized, api.BuildResponse{Error: k6build.NewError(api.ErrRequestFailed, errors.New("unauthorized"))}),
+				withResponse(http.StatusUnauthorized, api.BuildResponse{Error: k6build.NewWrappedError(api.ErrRequestFailed, errors.New("unauthorized"))}),
 			},
 			expectErr: api.ErrRequestFailed,
 		},
