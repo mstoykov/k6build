@@ -10,12 +10,12 @@ import (
 	"testing"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6build/pkg/cache"
-	"github.com/grafana/k6build/pkg/cache/api"
+	"github.com/grafana/k6build/pkg/store"
+	"github.com/grafana/k6build/pkg/store/api"
 )
 
 // returns a HandleFunc that returns a canned status and response
-func handlerMock(status int, resp *api.CacheResponse) http.HandlerFunc {
+func handlerMock(status int, resp *api.StoreResponse) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 
@@ -46,35 +46,35 @@ func downloadMock(status int, content []byte) http.HandlerFunc {
 	}
 }
 
-func TestCacheClientGet(t *testing.T) {
+func TestStoreClientGet(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
 		title     string
 		status    int
-		resp      *api.CacheResponse
+		resp      *api.StoreResponse
 		expectErr error
 	}{
 		{
 			title:  "normal get",
 			status: http.StatusOK,
-			resp: &api.CacheResponse{
+			resp: &api.StoreResponse{
 				Error:  nil,
-				Object: cache.Object{},
+				Object: store.Object{},
 			},
 		},
 		{
 			title:     "object not found",
 			status:    http.StatusNotFound,
 			resp:      nil,
-			expectErr: cache.ErrObjectNotFound,
+			expectErr: store.ErrObjectNotFound,
 		},
 		{
 			title:  "error accessing object",
 			status: http.StatusInternalServerError,
-			resp: &api.CacheResponse{
-				Error:  k6build.NewWrappedError(cache.ErrAccessingObject, k6build.ErrReasonUnknown),
-				Object: cache.Object{},
+			resp: &api.StoreResponse{
+				Error:  k6build.NewWrappedError(store.ErrAccessingObject, k6build.ErrReasonUnknown),
+				Object: store.Object{},
 			},
 			expectErr: api.ErrRequestFailed,
 		},
@@ -87,7 +87,7 @@ func TestCacheClientGet(t *testing.T) {
 
 			srv := httptest.NewServer(handlerMock(tc.status, tc.resp))
 
-			client, err := NewCacheClient(CacheClientConfig{Server: srv.URL})
+			client, err := NewStoreClient(StoreClientConfig{Server: srv.URL})
 			if err != nil {
 				t.Fatalf("test setup %v", err)
 			}
@@ -100,29 +100,29 @@ func TestCacheClientGet(t *testing.T) {
 	}
 }
 
-func TestCacheClientStore(t *testing.T) {
+func TestStoreClientPut(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
 		title     string
 		status    int
-		resp      *api.CacheResponse
+		resp      *api.StoreResponse
 		expectErr error
 	}{
 		{
 			title:  "normal response",
 			status: http.StatusOK,
-			resp: &api.CacheResponse{
+			resp: &api.StoreResponse{
 				Error:  nil,
-				Object: cache.Object{},
+				Object: store.Object{},
 			},
 		},
 		{
 			title:  "error creating object",
 			status: http.StatusInternalServerError,
-			resp: &api.CacheResponse{
-				Error:  k6build.NewWrappedError(cache.ErrCreatingObject, k6build.ErrReasonUnknown),
-				Object: cache.Object{},
+			resp: &api.StoreResponse{
+				Error:  k6build.NewWrappedError(store.ErrCreatingObject, k6build.ErrReasonUnknown),
+				Object: store.Object{},
 			},
 			expectErr: api.ErrRequestFailed,
 		},
@@ -135,12 +135,12 @@ func TestCacheClientStore(t *testing.T) {
 
 			srv := httptest.NewServer(handlerMock(tc.status, tc.resp))
 
-			client, err := NewCacheClient(CacheClientConfig{Server: srv.URL})
+			client, err := NewStoreClient(StoreClientConfig{Server: srv.URL})
 			if err != nil {
 				t.Fatalf("test setup %v", err)
 			}
 
-			_, err = client.Store(context.TODO(), "object", bytes.NewBuffer(nil))
+			_, err = client.Put(context.TODO(), "object", bytes.NewBuffer(nil))
 			if !errors.Is(err, tc.expectErr) {
 				t.Fatalf("expected %v got %v", tc.expectErr, err)
 			}
@@ -148,7 +148,7 @@ func TestCacheClientStore(t *testing.T) {
 	}
 }
 
-func TestCacheClientDownload(t *testing.T) {
+func TestStoreClientDownload(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -176,12 +176,12 @@ func TestCacheClientDownload(t *testing.T) {
 
 			srv := httptest.NewServer(downloadMock(tc.status, tc.content))
 
-			client, err := NewCacheClient(CacheClientConfig{Server: srv.URL})
+			client, err := NewStoreClient(StoreClientConfig{Server: srv.URL})
 			if err != nil {
 				t.Fatalf("test setup %v", err)
 			}
 
-			obj := cache.Object{
+			obj := store.Object{
 				ID:  "object",
 				URL: srv.URL,
 			}

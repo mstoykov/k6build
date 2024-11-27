@@ -45,70 +45,10 @@ TODO: use [k6-operator](https://github.com/grafana/k6-operator) for running the 
 
 ## Commands
 
-* [k6build cache](#k6build-cache)	 - k6build cache server
 * [k6build local](#k6build-local)	 - build custom k6 binary locally
 * [k6build remote](#k6build-remote)	 - build a custom k6 using a remote build server
 * [k6build server](#k6build-server)	 - k6 build service
-
----
-# k6build cache
-
-k6build cache server
-
-## Synopsis
-
-
-Starts a k6build cache server. 
-
-The cache server offers a REST API for storing and downloading objects.
-
-Objects can be retrieved by a download url returned when the object is stored.
-
-The --download-url specifies the base URL for downloading objects. This is necessary to allow
-downloading the objects from different machines.
-
-
-```
-k6build cache [flags]
-```
-
-## Examples
-
-```
-
-# start the cache server serving an external url
-k6build cache --download-url http://external.url
-
-# store object from same host
-curl -x POST http://localhost:9000/cache/objectID -d "object content" | jq .
-{
-	"Error": "",
-	"Object": {
-	  "ID": "objectID",
-	  "Checksum": "17d3eb873fe4b1aac4f9d2505aefbb5b53b9a7f34a6aadd561be104c0e9d678b",
-	  "URL": "http://external.url:9000/cache/objectID/download"
-	}
-      }
-
-# download object from another machine using the external url
-curl http://external.url:9000/cache/objectID/download
-
-```
-
-## Flags
-
-```
-  -c, --cache-dir string      cache directory (default "/tmp/cache/objectstore")
-  -d, --download-url string   base url used for downloading objects.
-                              If not specified http://localhost:<port>/cache is used
-  -h, --help                  help for cache
-  -l, --log-level string      log level (default "INFO")
-  -p, --port int              port server will listen (default 9000)
-```
-
-## SEE ALSO
-
-* [k6build](#k6build)	 - Build custom k6 binaries with extensions
+* [k6build store](#k6build-store)	 - k6build object store server
 
 ---
 # k6build local
@@ -162,8 +102,8 @@ k6build local -k v0.50.0 -e GOPROXY=http://localhost:80 -q
 ## Flags
 
 ```
-  -f, --cache-dir string         cache dir (default "/tmp/buildservice")
-  -c, --catalog string           dependencies catalog (default "catalog.json")
+      --allow-prereleases        allow building pre-releases.
+  -c, --catalog string           dependencies catalog (default "https://registry.k6.io/catalog.json")
   -g, --copy-go-env              copy go environment (default true)
   -d, --dependency stringArray   list of dependencies in form package:constrains
   -e, --env stringToString       build environment variables (default [])
@@ -172,6 +112,7 @@ k6build local -k v0.50.0 -e GOPROXY=http://localhost:80 -q
   -o, --output string            path to put the binary as an executable. (default "k6")
   -p, --platform string          target platform (default GOOS/GOARCH)
   -q, --quiet                    don't print artifact's details
+  -f, --store-dir string         object store dir (default "/tmp/k6build/store")
   -v, --verbose                  print build process output
 ```
 
@@ -212,7 +153,7 @@ k6: v0.51.0
 k6/x/kubernetes: v0.9.0
 k6/x/output-kafka": v0.7.0
 checksum: f4af178bb2e29862c0fc7d481076c9ba4468572903480fe9d6c999fea75f3793
-url: http://localhost:8000/cache/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download
+url: http://localhost:8000/store/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download
 
 
 # build k6 v0.51 with k6/x/output-kafka v0.7.0 and download as 'build/k6'
@@ -278,7 +219,7 @@ For example
 	{
 	  "artifact": {
 	  "id": "5a241ba6ff643075caadbd06d5a326e5e74f6f10",
-	  "url": "http://localhost:9000/cache/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
+	  "url": "http://localhost:9000/store/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
 	  "dependencies": {
 	    "k6": "v0.50.0",
 	    "k6/x/kubernetes": "v0.10.0"
@@ -313,7 +254,6 @@ k6build server -e GOPROXY=http://localhost:80
 
 ```
       --allow-prereleases    allow building pre-releases.
-      --cache-url string     cache server url (default "http://localhost:9000/cache")
   -c, --catalog string       dependencies catalog. Can be path to a local file or an URL.
                               (default "https://registry.k6.io/catalog.json")
   -g, --copy-go-env          copy go environment (default true)
@@ -322,7 +262,68 @@ k6build server -e GOPROXY=http://localhost:80
   -h, --help                 help for server
   -l, --log-level string     log level (default "INFO")
   -p, --port int             port server will listen (default 8000)
+      --store-url string     store server url (default "http://localhost:9000/store")
   -v, --verbose              print build process output
+```
+
+## SEE ALSO
+
+* [k6build](#k6build)	 - Build custom k6 binaries with extensions
+
+---
+# k6build store
+
+k6build object store server
+
+## Synopsis
+
+
+Starts a k6build objectstore server. 
+
+The object server offers a REST API for storing and downloading objects.
+
+Objects can be retrieved by a download url returned when the object is stored.
+
+The --download-url specifies the base URL for downloading objects. This is necessary to allow
+downloading the objects from different machines.
+
+
+```
+k6build store [flags]
+```
+
+## Examples
+
+```
+
+# start the server serving an external url
+k6build store --download-url http://external.url
+
+# store object from same host
+curl -x POST http://localhost:9000/store/objectID -d "object content" | jq .
+{
+	"Error": "",
+	"Object": {
+	  "ID": "objectID",
+	  "Checksum": "17d3eb873fe4b1aac4f9d2505aefbb5b53b9a7f34a6aadd561be104c0e9d678b",
+	  "URL": "http://external.url:9000/store/objectID/download"
+	}
+      }
+
+# download object from another machine using the external url
+curl http://external.url:9000/store/objectID/download
+
+```
+
+## Flags
+
+```
+  -d, --download-url string   base url used for downloading objects.
+                              If not specified http://localhost:<port>/store is used
+  -h, --help                  help for store
+  -l, --log-level string      log level (default "INFO")
+  -p, --port int              port server will listen (default 9000)
+  -c, --store-dir string      object store directory (default "/tmp/store/objectstore")
 ```
 
 ## SEE ALSO

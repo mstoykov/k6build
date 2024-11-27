@@ -34,7 +34,7 @@ k6: v0.51.0
 k6/x/kubernetes: v0.9.0
 k6/x/output-kafka": v0.7.0
 checksum: f4af178bb2e29862c0fc7d481076c9ba4468572903480fe9d6c999fea75f3793
-url: http://localhost:8000/cache/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download
+url: http://localhost:8000/store/62d08b13fdef171435e2c6874eaad0bb35f2f9c7/download
 
 
 # build k6 v0.51 with k6/x/output-kafka v0.7.0 and download as 'build/k6'

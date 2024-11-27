@@ -13,9 +13,9 @@ import (
 	"sync"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6build/pkg/cache"
-	"github.com/grafana/k6build/pkg/cache/client"
-	"github.com/grafana/k6build/pkg/cache/file"
+	"github.com/grafana/k6build/pkg/store"
+	"github.com/grafana/k6build/pkg/store/client"
+	"github.com/grafana/k6build/pkg/store/file"
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
 )
@@ -46,10 +46,10 @@ type BuildServiceConfig struct {
 	BuildEnv map[string]string
 	// path to catalog's json file. Can be a file path or a URL
 	Catalog string
-	// url to remote cache service
-	CacheURL string
-	// path to cache dir
-	CacheDir string
+	// url to remote object store service
+	StoreURL string
+	// path to object store dir
+	StoreDir string
 	// Copy go environment. BuildEnv can override the variables copied from go environment.
 	CopyGoEnv bool
 	// set verbose build mode
@@ -63,7 +63,7 @@ type localBuildSrv struct {
 	allowPrereleases bool
 	catalog          k6catalog.Catalog
 	builder          k6foundry.Builder
-	cache            cache.Cache
+	store            store.ObjectStore
 	mutexes          sync.Map
 }
 
@@ -90,19 +90,19 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
-	var cache cache.Cache
+	var store store.ObjectStore
 
-	if config.CacheURL != "" {
-		cache, err = client.NewCacheClient(
-			client.CacheClientConfig{
-				Server: config.CacheURL,
+	if config.StoreURL != "" {
+		store, err = client.NewStoreClient(
+			client.StoreClientConfig{
+				Server: config.StoreURL,
 			},
 		)
 		if err != nil {
 			return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 		}
 	} else {
-		cache, err = file.NewFileCache(config.CacheDir)
+		store, err = file.NewFileStore(config.StoreDir)
 		if err != nil {
 			return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 		}
@@ -112,7 +112,7 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 		allowPrereleases: config.AllowPrereleases,
 		catalog:          catalog,
 		builder:          builder,
-		cache:            cache,
+		store:            store,
 	}, nil
 }
 
@@ -128,7 +128,7 @@ func DefaultLocalBuildService() (k6build.BuildService, error) {
 		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
-	cache, err := file.NewTempFileCache()
+	store, err := file.NewTempFileStore()
 	if err != nil {
 		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
@@ -136,7 +136,7 @@ func DefaultLocalBuildService() (k6build.BuildService, error) {
 	return &localBuildSrv{
 		catalog: catalog,
 		builder: builder,
-		cache:   cache,
+		store:   store,
 	}, nil
 }
 
@@ -200,7 +200,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	unlock := b.lockArtifact(id)
 	defer unlock()
 
-	artifactObject, err := b.cache.Get(ctx, id)
+	artifactObject, err := b.store.Get(ctx, id)
 	if err == nil {
 		return k6build.Artifact{
 			ID:           id,
@@ -211,7 +211,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 		}, nil
 	}
 
-	if !errors.Is(err, cache.ErrObjectNotFound) {
+	if !errors.Is(err, store.ErrObjectNotFound) {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
@@ -227,7 +227,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 		resolved[k6Dep] = buildInfo.ModVersions[k6Mod.Path]
 	}
 
-	artifactObject, err = b.cache.Store(ctx, id, artifactBuffer)
+	artifactObject, err = b.store.Put(ctx, id, artifactBuffer)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
@@ -242,9 +242,10 @@ func (b *localBuildSrv) Build( //nolint:funlen
 }
 
 // lockArtifact obtains a mutex used to prevent concurrent builds of the same artifact and
-// returns a function that will unlock the mutex associated to the given id in the cache.
+// returns a function that will unlock the mutex associated to the given id in the object store.
 // The lock is also removed from the map. Subsequent calls will get another lock on the same
-// id but this is safe as the object should already be in the cache and no further builds are needed.
+// id but this is safe as the object should already be in the object strore and no further
+// builds are needed.
 func (b *localBuildSrv) lockArtifact(id string) func() {
 	value, _ := b.mutexes.LoadOrStore(id, &sync.Mutex{})
 	mtx, _ := value.(*sync.Mutex)

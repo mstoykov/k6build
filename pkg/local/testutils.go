@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6build/pkg/cache/file"
+	"github.com/grafana/k6build/pkg/store/file"
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
 	"github.com/grafana/k6foundry/pkg/testutils/goproxy"
@@ -84,15 +84,15 @@ func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
 		return nil, fmt.Errorf("setting up test builder %w", err)
 	}
 
-	cache, err := file.NewFileCache(t.TempDir())
+	store, err := file.NewFileStore(t.TempDir())
 	if err != nil {
-		return nil, fmt.Errorf("creating temp cache %w", err)
+		return nil, fmt.Errorf("creating temporary object store %w", err)
 	}
 
 	buildsrv := &localBuildSrv{
 		builder: builder,
 		catalog: catalog,
-		cache:   cache,
+		store:   store,
 	}
 
 	return buildsrv, nil

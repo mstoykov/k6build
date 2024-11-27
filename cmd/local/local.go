@@ -126,7 +126,7 @@ func New() *cobra.Command { //nolint:funlen
 	cmd.Flags().StringVarP(&platform, "platform", "p", "", "target platform (default GOOS/GOARCH)")
 	_ = cmd.MarkFlagRequired("platform")
 	cmd.Flags().StringVarP(&config.Catalog, "catalog", "c", k6catalog.DefaultCatalogURL, "dependencies catalog")
-	cmd.Flags().StringVarP(&config.CacheDir, "cache-dir", "f", "/tmp/buildservice", "cache dir")
+	cmd.Flags().StringVarP(&config.StoreDir, "store-dir", "f", "/tmp/k6build/store", "object store dir")
 	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
 	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")

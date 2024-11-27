@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/grafana/k6build/pkg/cache"
+	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/util"
 )
 
@@ -19,23 +19,23 @@ type object struct {
 	content []byte
 }
 
-func setupCache(path string, preload []object) (cache.Cache, error) {
-	cache, err := NewFileCache(path)
+func setupStore(path string, preload []object) (store.ObjectStore, error) {
+	store, err := NewFileStore(path)
 	if err != nil {
 		return nil, fmt.Errorf("test setup %w", err)
 	}
 
 	for _, o := range preload {
-		_, err = cache.Store(context.TODO(), o.id, bytes.NewBuffer(o.content))
+		_, err = store.Put(context.TODO(), o.id, bytes.NewBuffer(o.content))
 		if err != nil {
 			return nil, fmt.Errorf("test setup %w", err)
 		}
 	}
 
-	return cache, nil
+	return store, nil
 }
 
-func TestFileCacheStoreObject(t *testing.T) {
+func TestFileStoreStoreObject(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -60,7 +60,7 @@ func TestFileCacheStoreObject(t *testing.T) {
 			},
 			id:        "object",
 			content:   []byte("new content"),
-			expectErr: cache.ErrCreatingObject,
+			expectErr: store.ErrCreatingObject,
 		},
 		{
 			title:   "store empty object",
@@ -71,31 +71,31 @@ func TestFileCacheStoreObject(t *testing.T) {
 			title:     "store empty id",
 			id:        "",
 			content:   []byte("content"),
-			expectErr: cache.ErrCreatingObject,
+			expectErr: store.ErrCreatingObject,
 		},
 		{
 			title:     "store invalid id (dot slash)",
 			id:        "./invalid",
 			content:   []byte("content"),
-			expectErr: cache.ErrCreatingObject,
+			expectErr: store.ErrCreatingObject,
 		},
 		{
 			title:     "store invalid id (trailing slash)",
 			id:        "invalid/",
 			content:   []byte("content"),
-			expectErr: cache.ErrCreatingObject,
+			expectErr: store.ErrCreatingObject,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
-			cache, err := setupCache(t.TempDir(), tc.preload)
+			store, err := setupStore(t.TempDir(), tc.preload)
 			if err != nil {
 				t.Fatalf("test setup: %v", err)
 			}
 
-			obj, err := cache.Store(context.TODO(), tc.id, bytes.NewBuffer(tc.content))
+			obj, err := store.Put(context.TODO(), tc.id, bytes.NewBuffer(tc.content))
 			if !errors.Is(err, tc.expectErr) {
 				t.Fatalf("expected %v got %v", tc.expectErr, err)
 			}
@@ -123,7 +123,7 @@ func TestFileCacheStoreObject(t *testing.T) {
 	}
 }
 
-func TestFileCacheRetrieval(t *testing.T) {
+func TestFileStoreRetrieval(t *testing.T) {
 	t.Parallel()
 
 	preload := []object{
@@ -133,13 +133,13 @@ func TestFileCacheRetrieval(t *testing.T) {
 		},
 	}
 
-	cacheDir := t.TempDir()
-	fileCache, err := setupCache(cacheDir, preload)
+	storeDir := t.TempDir()
+	fileStore, err := setupStore(storeDir, preload)
 	if err != nil {
 		t.Fatalf("test setup: %v", err)
 	}
 
-	t.Run("TestFileCacheGet", func(t *testing.T) {
+	t.Run("TestFileStoreGet", func(t *testing.T) {
 		testCases := []struct {
 			title     string
 			id        string
@@ -155,7 +155,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 			{
 				title:     "retrieve non existing object",
 				id:        "another object",
-				expectErr: cache.ErrObjectNotFound,
+				expectErr: store.ErrObjectNotFound,
 			},
 		}
 
@@ -163,7 +163,7 @@ func TestFileCacheRetrieval(t *testing.T) {
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
 
-				obj, err := fileCache.Get(context.TODO(), tc.id)
+				obj, err := fileStore.Get(context.TODO(), tc.id)
 				if !errors.Is(err, tc.expectErr) {
 					t.Fatalf("expected %v got %v", tc.expectErr, err)
 				}
@@ -191,8 +191,8 @@ func TestFileCacheRetrieval(t *testing.T) {
 		}
 	})
 
-	// FIXME: This test is leaking how the file cache creates the URLs for the objects
-	t.Run("TestFileCacheDownload", func(t *testing.T) {
+	// FIXME: This test is leaking how the file store creates the URLs for the objects
+	t.Run("TestFileStoreDownload", func(t *testing.T) {
 		t.Parallel()
 
 		testCases := []struct {
@@ -205,21 +205,21 @@ func TestFileCacheRetrieval(t *testing.T) {
 			{
 				title:     "download existing object",
 				id:        "object",
-				url:       filepath.Join(cacheDir, "/object/data"),
+				url:       filepath.Join(storeDir, "/object/data"),
 				expected:  []byte("content"),
 				expectErr: nil,
 			},
 			{
 				title:     "download non existing object",
 				id:        "object",
-				url:       filepath.Join(cacheDir, "/another_object/data"),
-				expectErr: cache.ErrObjectNotFound,
+				url:       filepath.Join(storeDir, "/another_object/data"),
+				expectErr: store.ErrObjectNotFound,
 			},
 			{
 				title:     "download malicious url",
 				id:        "object",
-				url:       filepath.Join(cacheDir, "/../../data"),
-				expectErr: cache.ErrInvalidURL,
+				url:       filepath.Join(storeDir, "/../../data"),
+				expectErr: store.ErrInvalidURL,
 			},
 		}
 
@@ -228,8 +228,8 @@ func TestFileCacheRetrieval(t *testing.T) {
 				t.Parallel()
 
 				objectURL, _ := util.URLFromFilePath(tc.url)
-				object := cache.Object{ID: tc.id, URL: objectURL.String()}
-				content, err := fileCache.Download(context.TODO(), object)
+				object := store.Object{ID: tc.id, URL: objectURL.String()}
+				content, err := fileStore.Download(context.TODO(), object)
 				if !errors.Is(err, tc.expectErr) {
 					t.Fatalf("expected %v got %v", tc.expectErr, err)
 				}

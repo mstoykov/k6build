@@ -41,7 +41,7 @@ For example
 	{
 	  "artifact": {
 	  "id": "5a241ba6ff643075caadbd06d5a326e5e74f6f10",
-	  "url": "http://localhost:9000/cache/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
+	  "url": "http://localhost:9000/store/5a241ba6ff643075caadbd06d5a326e5e74f6f10/download",
 	  "dependencies": {
 	    "k6": "v0.50.0",
 	    "k6/x/kubernetes": "v0.10.0"
@@ -142,7 +142,7 @@ func New() *cobra.Command { //nolint:funlen
 		"dependencies catalog. Can be path to a local file or an URL."+
 			"\n",
 	)
-	cmd.Flags().StringVar(&config.CacheURL, "cache-url", "http://localhost:9000/cache", "cache server url")
+	cmd.Flags().StringVar(&config.StoreURL, "store-url", "http://localhost:9000/store", "store server url")
 	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
 	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")

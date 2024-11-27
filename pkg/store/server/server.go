@@ -1,4 +1,4 @@
-// Package server implements a cache server
+// Package server implements an object store server
 package server
 
 import (
@@ -11,26 +11,26 @@ import (
 	"net/http"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6build/pkg/cache"
-	"github.com/grafana/k6build/pkg/cache/api"
+	"github.com/grafana/k6build/pkg/store"
+	"github.com/grafana/k6build/pkg/store/api"
 )
 
-// CacheServer implements an http server that handles cache requests
-type CacheServer struct {
+// StoreServer implements an http server that handles object store requests
+type StoreServer struct {
 	baseURL string
-	cache   cache.Cache
+	store   store.ObjectStore
 	log     *slog.Logger
 }
 
-// CacheServerConfig defines the configuration for the APIServer
-type CacheServerConfig struct {
+// StoreServerConfig defines the configuration for the APIServer
+type StoreServerConfig struct {
 	BaseURL string
-	Cache   cache.Cache
+	Store   store.ObjectStore
 	Log     *slog.Logger
 }
 
-// NewCacheServer returns a CacheServer backed by a cache
-func NewCacheServer(config CacheServerConfig) http.Handler {
+// NewStoreServer returns a StoreServer backed by a file object store
+func NewStoreServer(config StoreServerConfig) http.Handler {
 	log := config.Log
 
 	if log == nil {
@@ -41,24 +41,24 @@ func NewCacheServer(config CacheServerConfig) http.Handler {
 			),
 		)
 	}
-	cacheSrv := &CacheServer{
+	storeSrv := &StoreServer{
 		baseURL: config.BaseURL,
-		cache:   config.Cache,
+		store:   config.Store,
 		log:     log,
 	}
 
 	handler := http.NewServeMux()
 	// FIXME: this should be PUT (used POST as http client doesn't have PUT method)
-	handler.HandleFunc("POST /{id}", cacheSrv.Store)
-	handler.HandleFunc("GET /{id}", cacheSrv.Get)
-	handler.HandleFunc("GET /{id}/download", cacheSrv.Download)
+	handler.HandleFunc("POST /{id}", storeSrv.Store)
+	handler.HandleFunc("GET /{id}", storeSrv.Get)
+	handler.HandleFunc("GET /{id}/download", storeSrv.Download)
 
 	return handler
 }
 
-// Get retrieves an objects if exists in the cache or an error otherwise
-func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
-	resp := api.CacheResponse{}
+// Get retrieves an objects if exists in the object store or an error otherwise
+func (s *StoreServer) Get(w http.ResponseWriter, r *http.Request) {
+	resp := api.StoreResponse{}
 
 	w.Header().Add("Content-Type", "application/json")
 
@@ -71,23 +71,23 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	object, err := s.cache.Get(context.Background(), id) //nolint:contextcheck
+	object, err := s.store.Get(context.Background(), id) //nolint:contextcheck
 	if err != nil {
-		if errors.Is(err, cache.ErrObjectNotFound) {
+		if errors.Is(err, store.ErrObjectNotFound) {
 			s.log.Debug(err.Error())
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			s.log.Error(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		resp.Error = k6build.NewWrappedError(api.ErrCacheAccess, err)
+		resp.Error = k6build.NewWrappedError(api.ErrObjectStoreAccess, err)
 		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 
 		return
 	}
 
 	downloadURL := getDownloadURL(s.baseURL, r)
-	resp.Object = cache.Object{
+	resp.Object = store.Object{
 		ID:       id,
 		Checksum: object.Checksum,
 		URL:      downloadURL,
@@ -98,8 +98,8 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Store stores the object and returns the metadata
-func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
-	resp := api.CacheResponse{}
+func (s *StoreServer) Store(w http.ResponseWriter, r *http.Request) {
+	resp := api.StoreResponse{}
 
 	w.Header().Add("Content-Type", "application/json")
 
@@ -118,15 +118,15 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	object, err := s.cache.Store(context.Background(), id, r.Body) //nolint:contextcheck
+	object, err := s.store.Put(context.Background(), id, r.Body) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = k6build.NewWrappedError(api.ErrCacheAccess, err)
+		resp.Error = k6build.NewWrappedError(api.ErrObjectStoreAccess, err)
 		return
 	}
 
 	downloadURL := getDownloadURL(s.baseURL, r)
-	resp.Object = cache.Object{
+	resp.Object = store.Object{
 		ID:       id,
 		Checksum: object.Checksum,
 		URL:      downloadURL,
@@ -145,16 +145,16 @@ func getDownloadURL(baseURL string, r *http.Request) string {
 }
 
 // Download returns an object's content given its id
-func (s *CacheServer) Download(w http.ResponseWriter, r *http.Request) {
+func (s *StoreServer) Download(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	object, err := s.cache.Get(context.Background(), id) //nolint:contextcheck
+	object, err := s.store.Get(context.Background(), id) //nolint:contextcheck
 	if err != nil {
-		if errors.Is(err, cache.ErrObjectNotFound) {
+		if errors.Is(err, store.ErrObjectNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -162,7 +162,7 @@ func (s *CacheServer) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectContent, err := s.cache.Download(context.Background(), object) //nolint:contextcheck
+	objectContent, err := s.store.Download(context.Background(), object) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

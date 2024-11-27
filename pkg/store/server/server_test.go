@@ -13,41 +13,41 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/k6build/pkg/cache"
-	"github.com/grafana/k6build/pkg/cache/api"
+	"github.com/grafana/k6build/pkg/store"
+	"github.com/grafana/k6build/pkg/store/api"
 )
 
-// MemoryCache defines the state of a memory backed cache
-type MemoryCache struct {
-	objects map[string]cache.Object
+// MemoryStore implements a memory backed object store
+type MemoryStore struct {
+	objects map[string]store.Object
 	content map[string][]byte
 }
 
-func NewMemoryCache() *MemoryCache {
-	return &MemoryCache{
-		objects: map[string]cache.Object{},
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{
+		objects: map[string]store.Object{},
 		content: map[string][]byte{},
 	}
 }
 
-func (f *MemoryCache) Get(_ context.Context, id string) (cache.Object, error) {
+func (f *MemoryStore) Get(_ context.Context, id string) (store.Object, error) {
 	object, found := f.objects[id]
 	if !found {
-		return cache.Object{}, cache.ErrObjectNotFound
+		return store.Object{}, store.ErrObjectNotFound
 	}
 
 	return object, nil
 }
 
-func (f *MemoryCache) Store(_ context.Context, id string, content io.Reader) (cache.Object, error) {
+func (f *MemoryStore) Put(_ context.Context, id string, content io.Reader) (store.Object, error) {
 	buffer := bytes.Buffer{}
 	_, err := buffer.ReadFrom(content)
 	if err != nil {
-		return cache.Object{}, cache.ErrCreatingObject
+		return store.Object{}, store.ErrCreatingObject
 	}
 
 	checksum := fmt.Sprintf("%x", sha256.Sum256(buffer.Bytes()))
-	object := cache.Object{
+	object := store.Object{
 		ID:       id,
 		Checksum: checksum,
 		URL:      fmt.Sprintf("memory:///%s", id),
@@ -59,8 +59,7 @@ func (f *MemoryCache) Store(_ context.Context, id string, content io.Reader) (ca
 	return object, nil
 }
 
-// Download implements Cache.
-func (f *MemoryCache) Download(_ context.Context, object cache.Object) (io.ReadCloser, error) {
+func (f *MemoryStore) Download(_ context.Context, object store.Object) (io.ReadCloser, error) {
 	url, err := url.Parse(object.URL)
 	if err != nil {
 		return nil, err
@@ -69,33 +68,33 @@ func (f *MemoryCache) Download(_ context.Context, object cache.Object) (io.ReadC
 	id, _ := strings.CutPrefix(url.Path, "/")
 	content, found := f.content[id]
 	if !found {
-		return nil, cache.ErrObjectNotFound
+		return nil, store.ErrObjectNotFound
 	}
 
 	return io.NopCloser(bytes.NewBuffer(content)), nil
 }
 
-func TestCacheServerGet(t *testing.T) {
+func TestStoreServerGet(t *testing.T) {
 	t.Parallel()
 
-	cache := NewMemoryCache()
+	store := NewMemoryStore()
 	objects := map[string][]byte{
 		"object1": []byte("content object 1"),
 	}
 
 	for id, content := range objects {
 		buffer := bytes.NewBuffer(content)
-		if _, err := cache.Store(context.TODO(), id, buffer); err != nil {
+		if _, err := store.Put(context.TODO(), id, buffer); err != nil {
 			t.Fatalf("test setup: %v", err)
 		}
 	}
 
-	config := CacheServerConfig{
-		Cache: cache,
+	config := StoreServerConfig{
+		Store: store,
 	}
-	cacheSrv := NewCacheServer(config)
+	storeSrv := NewStoreServer(config)
 
-	srv := httptest.NewServer(cacheSrv)
+	srv := httptest.NewServer(storeSrv)
 
 	testCases := []struct {
 		title    string
@@ -133,37 +132,37 @@ func TestCacheServerGet(t *testing.T) {
 				t.Fatalf("expected %s got %s", http.StatusText(tc.status), resp.Status)
 			}
 
-			cacheResponse := api.CacheResponse{}
-			err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
+			storeResponse := api.StoreResponse{}
+			err = json.NewDecoder(resp.Body).Decode(&storeResponse)
 			if err != nil {
 				t.Fatalf("reading response content %v", err)
 			}
 
 			if tc.status != http.StatusOK {
-				if cacheResponse.Error == nil {
+				if storeResponse.Error == nil {
 					t.Fatalf("expected error message not none")
 				}
 				return
 			}
 
-			if cacheResponse.Object.ID != tc.id {
-				t.Fatalf("expected object id %s got %s", tc.id, cacheResponse.Object.ID)
+			if storeResponse.Object.ID != tc.id {
+				t.Fatalf("expected object id %s got %s", tc.id, storeResponse.Object.ID)
 			}
 		})
 	}
 }
 
-func TestCacheServerStore(t *testing.T) {
+func TestStoreServerPut(t *testing.T) {
 	t.Parallel()
 
-	cache := NewMemoryCache()
+	store := NewMemoryStore()
 
-	config := CacheServerConfig{
-		Cache: cache,
+	config := StoreServerConfig{
+		Store: store,
 	}
-	cacheSrv := NewCacheServer(config)
+	storeSrv := NewStoreServer(config)
 
-	srv := httptest.NewServer(cacheSrv)
+	srv := httptest.NewServer(storeSrv)
 
 	testCases := []struct {
 		title   string
@@ -201,47 +200,47 @@ func TestCacheServerStore(t *testing.T) {
 				t.Fatalf("expected %s got %s", http.StatusText(tc.status), resp.Status)
 			}
 
-			cacheResponse := api.CacheResponse{}
-			err = json.NewDecoder(resp.Body).Decode(&cacheResponse)
+			storeResponse := api.StoreResponse{}
+			err = json.NewDecoder(resp.Body).Decode(&storeResponse)
 			if err != nil {
 				t.Fatalf("reading response content %v", err)
 			}
 
 			if tc.status != http.StatusOK {
-				if cacheResponse.Error == nil {
+				if storeResponse.Error == nil {
 					t.Fatalf("expected error message not none")
 				}
 				return
 			}
 
-			if cacheResponse.Object.ID != tc.id {
-				t.Fatalf("expected object id %s got %s", tc.id, cacheResponse.Object.ID)
+			if storeResponse.Object.ID != tc.id {
+				t.Fatalf("expected object id %s got %s", tc.id, storeResponse.Object.ID)
 			}
 		})
 	}
 }
 
-func TestCacheServerDownload(t *testing.T) {
+func TestStoreServerDownload(t *testing.T) {
 	t.Parallel()
 
-	cache := NewMemoryCache()
+	store := NewMemoryStore()
 	objects := map[string][]byte{
 		"object1": []byte("content object 1"),
 	}
 
 	for id, content := range objects {
 		buffer := bytes.NewBuffer(content)
-		if _, err := cache.Store(context.TODO(), id, buffer); err != nil {
+		if _, err := store.Put(context.TODO(), id, buffer); err != nil {
 			t.Fatalf("test setup: %v", err)
 		}
 	}
 
-	config := CacheServerConfig{
-		Cache: cache,
+	config := StoreServerConfig{
+		Store: store,
 	}
-	cacheSrv := NewCacheServer(config)
+	storeSrv := NewStoreServer(config)
 
-	srv := httptest.NewServer(cacheSrv)
+	srv := httptest.NewServer(storeSrv)
 
 	testCases := []struct {
 		title   string
