@@ -71,7 +71,7 @@ type localBuildSrv struct {
 func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.BuildService, error) {
 	catalog, err := k6catalog.NewCatalog(ctx, config.Catalog)
 	if err != nil {
-		return nil, k6build.NewError(ErrInitializingBuilder, err)
+		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
 	builderOpts := k6foundry.NativeBuilderOpts{
@@ -87,7 +87,7 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 
 	builder, err := k6foundry.NewNativeBuilder(ctx, builderOpts)
 	if err != nil {
-		return nil, k6build.NewError(ErrInitializingBuilder, err)
+		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
 	var cache cache.Cache
@@ -99,12 +99,12 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 			},
 		)
 		if err != nil {
-			return nil, k6build.NewError(ErrInitializingBuilder, err)
+			return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 		}
 	} else {
 		cache, err = file.NewFileCache(config.CacheDir)
 		if err != nil {
-			return nil, k6build.NewError(ErrInitializingBuilder, err)
+			return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 		}
 	}
 
@@ -120,17 +120,17 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 func DefaultLocalBuildService() (k6build.BuildService, error) {
 	catalog, err := k6catalog.DefaultCatalog()
 	if err != nil {
-		return nil, k6build.NewError(ErrInitializingBuilder, err)
+		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
 	builder, err := k6foundry.NewDefaultNativeBuilder()
 	if err != nil {
-		return nil, k6build.NewError(ErrInitializingBuilder, err)
+		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
 	cache, err := file.NewTempFileCache()
 	if err != nil {
-		return nil, k6build.NewError(ErrInitializingBuilder, err)
+		return nil, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
 
 	return &localBuildSrv{
@@ -148,7 +148,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 ) (k6build.Artifact, error) {
 	buildPlatform, err := k6foundry.ParsePlatform(platform)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(ErrInvalidParameters, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 	}
 
 	// sort dependencies to ensure idempotence of build
@@ -167,7 +167,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	}
 	if prerelease != "" {
 		if !b.allowPrereleases {
-			return k6build.Artifact{}, k6build.NewError(ErrInvalidParameters, ErrPrereleaseNotAllowed)
+			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, ErrPrereleaseNotAllowed)
 		}
 		k6Mod = k6catalog.Module{Path: k6Path, Version: prerelease}
 	} else {
@@ -212,13 +212,13 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	}
 
 	if !errors.Is(err, cache.ErrObjectNotFound) {
-		return k6build.Artifact{}, k6build.NewError(ErrAccessingArtifact, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
 	artifactBuffer := &bytes.Buffer{}
 	buildInfo, err := b.builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(ErrAccessingArtifact, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
 	// if this is a prerelease, we must use the actual version built
@@ -229,7 +229,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 
 	artifactObject, err = b.cache.Store(ctx, id, artifactBuffer)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(ErrAccessingArtifact, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
 	return k6build.Artifact{
@@ -273,11 +273,17 @@ func isPrerelease(constrain string) (string, error) {
 	prerelease := matches[preIdx]
 
 	if op != "" && op != "=" {
-		return "", k6build.NewError(ErrInvalidParameters, fmt.Errorf("only exact match is allowed for pre-release versions"))
+		return "", k6build.NewWrappedError(
+			ErrInvalidParameters,
+			fmt.Errorf("only exact match is allowed for pre-release versions"),
+		)
 	}
 
 	if ver != "v0.0.0" {
-		return "", k6build.NewError(ErrInvalidParameters, fmt.Errorf("prerelease version must start with v0.0.0"))
+		return "", k6build.NewWrappedError(
+			ErrInvalidParameters,
+			fmt.Errorf("prerelease version must start with v0.0.0"),
+		)
 	}
 	return prerelease, nil
 }

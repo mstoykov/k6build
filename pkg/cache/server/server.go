@@ -65,7 +65,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = k6build.NewError(api.ErrInvalidRequest, fmt.Errorf("object id is required"))
+		resp.Error = k6build.NewWrappedError(api.ErrInvalidRequest, fmt.Errorf("object id is required"))
 		s.log.Error(resp.Error.Error())
 		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 		return
@@ -80,7 +80,7 @@ func (s *CacheServer) Get(w http.ResponseWriter, r *http.Request) {
 			s.log.Error(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		resp.Error = k6build.NewError(api.ErrCacheAccess, err)
+		resp.Error = k6build.NewWrappedError(api.ErrCacheAccess, err)
 		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 
 		return
@@ -114,14 +114,14 @@ func (s *CacheServer) Store(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = k6build.NewError(api.ErrInvalidRequest, fmt.Errorf("object id is required"))
+		resp.Error = k6build.NewWrappedError(api.ErrInvalidRequest, fmt.Errorf("object id is required"))
 		return
 	}
 
 	object, err := s.cache.Store(context.Background(), id, r.Body) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Error = k6build.NewError(api.ErrCacheAccess, err)
+		resp.Error = k6build.NewWrappedError(api.ErrCacheAccess, err)
 		return
 	}
 

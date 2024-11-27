@@ -6,33 +6,33 @@ import (
 	"fmt"
 )
 
-// ErrReasonUnknown signals the reason for an APIError in unknown
+// ErrReasonUnknown signals the reason for an WrappedError is unknown
 var ErrReasonUnknown = errors.New("reason unknown")
 
-// Error represents an error returned by the build service
+// WrappedError represents an error returned by the build service
 // This custom error type facilitates extracting the reason of an error
 // by using errors.Unwrap method.
 // It also facilitates checking an error (or its reason) using errors.Is by
 // comparing the error and its reason.
 // This custom type has the following known limitations:
-// - A nil Error 'e' will not satisfy errors.Is(e, nil)
+// - A nil WrappedError 'e' will not satisfy errors.Is(e, nil)
 // - Is method will not
-type Error struct {
+type WrappedError struct {
 	Err    error `json:"error,omitempty"`
 	Reason error `json:"reason,omitempty"`
 }
 
 // Error returns the Error as a string
-func (e *Error) Error() string {
+func (e *WrappedError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Err, e.Reason)
 }
 
-// Is returns true if the target error is the same as the Error or its reason
+// Is returns true if the target error is the same as the WrappedError or its reason
 // It attempts several strategies:
 // - compare error and reason to target's Error()
-// - unwrap the error and reason and compare to target's Error
+// - unwrap the error and reason and compare to target's WrappedError
 // - unwrap target and compares to the error recursively
-func (e *Error) Is(target error) bool {
+func (e *WrappedError) Is(target error) bool {
 	if target == nil {
 		return false
 	}
@@ -56,8 +56,8 @@ func (e *Error) Is(target error) bool {
 	return e.Is(errors.Unwrap(target))
 }
 
-// Unwrap returns the underlying reason for the Error
-func (e *Error) Unwrap() error {
+// Unwrap returns the underlying reason for the WrappedError
+func (e *WrappedError) Unwrap() error {
 	return e.Reason
 }
 
@@ -66,7 +66,6 @@ type jsonError struct {
 	Reason *jsonError `json:"reason,omitempty"`
 }
 
-// returns a jsonError as a wrapped error
 func wrap(e *jsonError) error {
 	if e == nil {
 		return nil
@@ -76,7 +75,7 @@ func wrap(e *jsonError) error {
 		return err
 	}
 
-	return NewError(err, wrap(e.Reason))
+	return NewWrappedError(err, wrap(e.Reason))
 }
 
 func unwrap(e error) *jsonError {
@@ -92,13 +91,13 @@ func unwrap(e error) *jsonError {
 	return &jsonError{Err: err.Err.Error(), Reason: unwrap(errors.Unwrap(err))}
 }
 
-// MarshalJSON implements the json.Marshaler interface for the Error type
-func (e *Error) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements the json.Marshaler interface for the WrappedError type
+func (e *WrappedError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(unwrap(e))
 }
 
-// UnmarshalJSON implements the json.Unmarshaler interface for the Error type
-func (e *Error) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements the json.Unmarshaler interface for the WrappedError type
+func (e *WrappedError) UnmarshalJSON(data []byte) error {
 	val := jsonError{}
 
 	if err := json.Unmarshal(data, &val); err != nil {
@@ -110,21 +109,21 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// NewError creates an Error from an error and a reason
+// NewWrappedError creates an Error from an error and a reason
 // If the reason is nil, ErrReasonUnknown is used
-func NewError(err error, reason error) *Error {
+func NewWrappedError(err error, reason error) *WrappedError {
 	if reason == nil {
 		reason = ErrReasonUnknown
 	}
-	return &Error{
+	return &WrappedError{
 		Err:    err,
 		Reason: reason,
 	}
 }
 
 // AsError returns an error as an Error, if possible
-func AsError(e error) (*Error, bool) {
-	err := &Error{}
+func AsError(e error) (*WrappedError, bool) {
+	err := &WrappedError{}
 	if !errors.As(e, &err) {
 		return nil, false
 	}

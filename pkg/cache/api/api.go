@@ -20,6 +20,6 @@ var (
 
 // CacheResponse is the response to a cache server request
 type CacheResponse struct {
-	Error  *k6build.Error
+	Error  *k6build.WrappedError
 	Object cache.Object
 }

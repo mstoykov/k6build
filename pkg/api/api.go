@@ -42,7 +42,7 @@ type BuildResponse struct {
 	// If not empty an error occurred processing the request
 	// This Error can be compared to the errors defined in this package using errors.Is
 	// to know the type of error, and use Unwrap to obtain its cause if available.
-	Error *k6build.Error `json:"error,omitempty"`
+	Error *k6build.WrappedError `json:"error,omitempty"`
 	// Artifact metadata. If an error occurred, content is undefined
 	Artifact k6build.Artifact `json:"artifact,omitempty"`
 }

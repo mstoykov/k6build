@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func Test_Error(t *testing.T) {
+func Test_WrappedError(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -71,7 +71,7 @@ func Test_Error(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			err := NewError(tc.err, tc.reason)
+			err := NewWrappedError(tc.err, tc.reason)
 			for _, expected := range tc.expect {
 				if !errors.Is(err, expected) {
 					t.Fatalf("expected %v got %v", expected, err)
@@ -92,22 +92,22 @@ func Test_JsonSerialization(t *testing.T) {
 
 	testCases := []struct {
 		title  string
-		err    *Error
+		err    *WrappedError
 		expect []byte
 	}{
 		{
 			title:  "error with cause",
-			err:    NewError(err, reason),
+			err:    NewWrappedError(err, reason),
 			expect: []byte(`{"error":"error","reason":{"error":"reason"}}`),
 		},
 		{
 			title:  "error with nested causes",
-			err:    NewError(err, NewError(reason, root)),
+			err:    NewWrappedError(err, NewWrappedError(reason, root)),
 			expect: []byte(`{"error":"error","reason":{"error":"reason","reason":{"error":"root"}}}`),
 		},
 		{
 			title:  "error with nil cause",
-			err:    NewError(err, nil),
+			err:    NewWrappedError(err, nil),
 			expect: []byte(`{"error":"error","reason":{"error":"reason unknown"}}`),
 		},
 	}
@@ -125,7 +125,7 @@ func Test_JsonSerialization(t *testing.T) {
 				t.Fatalf("failed unmarshaling expected %v got %v", string(tc.expect), string(marshalled))
 			}
 
-			unmashalled := &Error{}
+			unmashalled := &WrappedError{}
 			err = json.Unmarshal(marshalled, unmashalled)
 			if err != nil {
 				t.Fatalf("error unmashaling: %v", err)

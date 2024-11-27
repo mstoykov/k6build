@@ -75,7 +75,7 @@ func (r *BuildClient) Build(
 	marshaled := &bytes.Buffer{}
 	err := json.NewEncoder(marshaled).Encode(buildRequest)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(api.ErrInvalidRequest, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrInvalidRequest, err)
 	}
 
 	url, err := url.Parse(r.srvURL)
@@ -86,7 +86,7 @@ func (r *BuildClient) Build(
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), marshaled)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -106,7 +106,7 @@ func (r *BuildClient) Build(
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -115,13 +115,13 @@ func (r *BuildClient) Build(
 	buildResponse := api.BuildResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&buildResponse)
 	if err != nil {
-		return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		// if an error occurred (e.g. internal server error) the Error may not be available
 		if buildResponse.Error == nil {
-			return k6build.Artifact{}, k6build.NewError(api.ErrRequestFailed, errors.New(resp.Status))
+			return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, errors.New(resp.Status))
 		}
 
 		// we expect the Error to have an api.Error we we don't wrap it again

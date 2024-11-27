@@ -34,7 +34,7 @@ func NewTempFileCache() (cache.Cache, error) {
 func NewFileCache(dir string) (cache.Cache, error) {
 	err := os.MkdirAll(dir, 0o750)
 	if err != nil {
-		return nil, k6build.NewError(cache.ErrInitializingCache, err)
+		return nil, k6build.NewWrappedError(cache.ErrInitializingCache, err)
 	}
 
 	return &Cache{
@@ -66,12 +66,12 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	// TODO: check permissions
 	err := os.MkdirAll(objectDir, 0o750)
 	if err != nil {
-		return cache.Object{}, k6build.NewError(cache.ErrCreatingObject, err)
+		return cache.Object{}, k6build.NewWrappedError(cache.ErrCreatingObject, err)
 	}
 
 	objectFile, err := os.Create(filepath.Join(objectDir, "data")) //nolint:gosec
 	if err != nil {
-		return cache.Object{}, k6build.NewError(cache.ErrCreatingObject, err)
+		return cache.Object{}, k6build.NewWrappedError(cache.ErrCreatingObject, err)
 	}
 	defer objectFile.Close() //nolint:errcheck
 
@@ -80,7 +80,7 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	buff := bytes.Buffer{}
 	_, err = io.Copy(objectFile, io.TeeReader(content, &buff))
 	if err != nil {
-		return cache.Object{}, k6build.NewError(cache.ErrCreatingObject, err)
+		return cache.Object{}, k6build.NewWrappedError(cache.ErrCreatingObject, err)
 	}
 
 	// calculate checksum
@@ -89,7 +89,7 @@ func (f *Cache) Store(_ context.Context, id string, content io.Reader) (cache.Ob
 	// write metadata
 	err = os.WriteFile(filepath.Join(objectDir, "checksum"), []byte(checksum), 0o644) //nolint:gosec
 	if err != nil {
-		return cache.Object{}, k6build.NewError(cache.ErrCreatingObject, err)
+		return cache.Object{}, k6build.NewWrappedError(cache.ErrCreatingObject, err)
 	}
 
 	objectURL, _ := util.URLFromFilePath(objectFile.Name())
@@ -110,12 +110,12 @@ func (f *Cache) Get(_ context.Context, id string) (cache.Object, error) {
 	}
 
 	if err != nil {
-		return cache.Object{}, k6build.NewError(cache.ErrAccessingObject, err)
+		return cache.Object{}, k6build.NewWrappedError(cache.ErrAccessingObject, err)
 	}
 
 	checksum, err := os.ReadFile(filepath.Join(objectDir, "checksum")) //nolint:gosec
 	if err != nil {
-		return cache.Object{}, k6build.NewError(cache.ErrAccessingObject, err)
+		return cache.Object{}, k6build.NewWrappedError(cache.ErrAccessingObject, err)
 	}
 
 	objectURL, _ := util.URLFromFilePath(filepath.Join(objectDir, "data"))
@@ -130,7 +130,7 @@ func (f *Cache) Get(_ context.Context, id string) (cache.Object, error) {
 func (f *Cache) Download(_ context.Context, object cache.Object) (io.ReadCloser, error) {
 	url, err := url.Parse(object.URL)
 	if err != nil {
-		return nil, k6build.NewError(cache.ErrAccessingObject, err)
+		return nil, k6build.NewWrappedError(cache.ErrAccessingObject, err)
 	}
 
 	switch url.Scheme {
@@ -152,7 +152,7 @@ func (f *Cache) Download(_ context.Context, object cache.Object) (io.ReadCloser,
 			if errors.Is(err, os.ErrNotExist) {
 				return nil, cache.ErrObjectNotFound
 			}
-			return nil, k6build.NewError(cache.ErrAccessingObject, err)
+			return nil, k6build.NewWrappedError(cache.ErrAccessingObject, err)
 		}
 
 		return objectFile, nil
