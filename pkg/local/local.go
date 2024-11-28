@@ -24,19 +24,19 @@ const (
 	k6Dep  = "k6"
 	k6Path = "go.k6.io/k6"
 
-	opRe  = `(?<operator>[=|~|>|<|\^|>=|<=|!=]){0,1}(?:\s*)`
-	verRe = `(?P<version>[v|V](?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`
-	preRe = `(?:[+|-|])(?P<prerelease>(?:[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))`
+	opRe    = `(?<operator>[=|~|>|<|\^|>=|<=|!=]){0,1}(?:\s*)`
+	verRe   = `(?P<version>[v|V](?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`
+	buildRe = `(?:[+|-|])(?P<build>(?:[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))`
 )
 
 var (
-	ErrAccessingArtifact    = errors.New("accessing artifact")           //nolint:revive
-	ErrBuildingArtifact     = errors.New("building artifact")            //nolint:revive
-	ErrInitializingBuilder  = errors.New("initializing builder")         //nolint:revive
-	ErrInvalidParameters    = errors.New("invalid build parameters")     //nolint:revive
-	ErrPrereleaseNotAllowed = errors.New("pre-releases are not allowed") //nolint:revive
+	ErrAccessingArtifact     = errors.New("accessing artifact")                      //nolint:revive
+	ErrBuildingArtifact      = errors.New("building artifact")                       //nolint:revive
+	ErrInitializingBuilder   = errors.New("initializing builder")                    //nolint:revive
+	ErrInvalidParameters     = errors.New("invalid build parameters")                //nolint:revive
+	ErrBuildSemverNotAllowed = errors.New("semvers with build metadata not allowed") //nolint:revive
 
-	constrainRe = regexp.MustCompile(opRe + verRe + preRe)
+	constrainRe = regexp.MustCompile(opRe + verRe + buildRe)
 )
 
 // BuildServiceConfig defines the configuration for a Local build service
@@ -54,17 +54,17 @@ type BuildServiceConfig struct {
 	CopyGoEnv bool
 	// set verbose build mode
 	Verbose bool
-	// Allow prerelease versions
-	AllowPrereleases bool
+	// Allow semvers with build metadata
+	AllowBuildSemvers bool
 }
 
 // buildSrv implements the BuildService interface
 type localBuildSrv struct {
-	allowPrereleases bool
-	catalog          k6catalog.Catalog
-	builder          k6foundry.Builder
-	store            store.ObjectStore
-	mutexes          sync.Map
+	allowBuildSemvers bool
+	catalog           k6catalog.Catalog
+	builder           k6foundry.Builder
+	store             store.ObjectStore
+	mutexes           sync.Map
 }
 
 // NewBuildService creates a local build service using the given configuration
@@ -109,10 +109,10 @@ func NewBuildService(ctx context.Context, config BuildServiceConfig) (k6build.Bu
 	}
 
 	return &localBuildSrv{
-		allowPrereleases: config.AllowPrereleases,
-		catalog:          catalog,
-		builder:          builder,
-		store:            store,
+		allowBuildSemvers: config.AllowBuildSemvers,
+		catalog:           catalog,
+		builder:           builder,
+		store:             store,
 	}, nil
 }
 
@@ -155,21 +155,21 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	sort.Slice(deps, func(i, j int) bool { return deps[i].Name < deps[j].Name })
 	resolved := map[string]string{}
 
-	// check if it is a pre-release version of the form v0.0.0-hash
-	// if it is a prerelease we don't check with the catalog, but instead we use
-	// the prerelease as version when building this module
+	// check if it is a semver of the form v0.0.0+<build>
+	// if it is, we don't check with the catalog, but instead we use
+	// the build metadata as version when building this module
 	// the build process will return the actual version built in the build info
 	// and we can check that version with the catalog
 	var k6Mod k6catalog.Module
-	prerelease, err := isPrerelease(k6Constrains)
+	buildMetadata, err := hasBuildMetadata(k6Constrains)
 	if err != nil {
 		return k6build.Artifact{}, err
 	}
-	if prerelease != "" {
-		if !b.allowPrereleases {
-			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, ErrPrereleaseNotAllowed)
+	if buildMetadata != "" {
+		if !b.allowBuildSemvers {
+			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, ErrBuildSemverNotAllowed)
 		}
-		k6Mod = k6catalog.Module{Path: k6Path, Version: prerelease}
+		k6Mod = k6catalog.Module{Path: k6Path, Version: buildMetadata}
 	} else {
 		k6Mod, err = b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
 		if err != nil {
@@ -221,9 +221,9 @@ func (b *localBuildSrv) Build( //nolint:funlen
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
-	// if this is a prerelease, we must use the actual version built
+	// if the version has a build metadata, we must use the actual version built
 	// TODO: check this version is supported
-	if prerelease != "" {
+	if buildMetadata != "" {
 		resolved[k6Dep] = buildInfo.ModVersions[k6Mod.Path]
 	}
 
@@ -257,12 +257,12 @@ func (b *localBuildSrv) lockArtifact(id string) func() {
 	}
 }
 
-// isPrerelease checks if the constrain references a pre-release version.
+// hasBuildMetadata checks if the constrain references a version with a build metadata.
 // E.g.  v0.1.0+build-effa45f
-func isPrerelease(constrain string) (string, error) {
+func hasBuildMetadata(constrain string) (string, error) {
 	opInx := constrainRe.SubexpIndex("operator")
 	verIdx := constrainRe.SubexpIndex("version")
-	preIdx := constrainRe.SubexpIndex("prerelease")
+	preIdx := constrainRe.SubexpIndex("build")
 	matches := constrainRe.FindStringSubmatch(constrain)
 
 	if matches == nil {
@@ -271,20 +271,20 @@ func isPrerelease(constrain string) (string, error) {
 
 	op := matches[opInx]
 	ver := matches[verIdx]
-	prerelease := matches[preIdx]
+	build := matches[preIdx]
 
 	if op != "" && op != "=" {
 		return "", k6build.NewWrappedError(
 			ErrInvalidParameters,
-			fmt.Errorf("only exact match is allowed for pre-release versions"),
+			fmt.Errorf("only exact match is allowed for versions with build metadata"),
 		)
 	}
 
 	if ver != "v0.0.0" {
 		return "", k6build.NewWrappedError(
 			ErrInvalidParameters,
-			fmt.Errorf("prerelease version must start with v0.0.0"),
+			fmt.Errorf("version with build metadata must start with v0.0.0"),
 		)
 	}
-	return prerelease, nil
+	return build, nil
 }
