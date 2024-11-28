@@ -102,7 +102,7 @@ k6build local -k v0.50.0 -e GOPROXY=http://localhost:80 -q
 ## Flags
 
 ```
-      --allow-prereleases        allow building pre-releases.
+      --allow-build-semvers      allow building versions with build metadata (e.g v0.0.0+build).
   -c, --catalog string           dependencies catalog (default "https://registry.k6.io/catalog.json")
   -g, --copy-go-env              copy go environment (default true)
   -d, --dependency stringArray   list of dependencies in form package:constrains
@@ -253,17 +253,17 @@ k6build server -e GOPROXY=http://localhost:80
 ## Flags
 
 ```
-      --allow-prereleases    allow building pre-releases.
-  -c, --catalog string       dependencies catalog. Can be path to a local file or an URL.
-                              (default "https://registry.k6.io/catalog.json")
-  -g, --copy-go-env          copy go environment (default true)
-      --enable-cgo           enable CGO for building binaries.
-  -e, --env stringToString   build environment variables (default [])
-  -h, --help                 help for server
-  -l, --log-level string     log level (default "INFO")
-  -p, --port int             port server will listen (default 8000)
-      --store-url string     store server url (default "http://localhost:9000/store")
-  -v, --verbose              print build process output
+      --allow-build-semvers   allow building versions with build metadata (e.g v0.0.0+build).
+  -c, --catalog string        dependencies catalog. Can be path to a local file or an URL.
+                               (default "https://registry.k6.io/catalog.json")
+  -g, --copy-go-env           copy go environment (default true)
+      --enable-cgo            enable CGO for building binaries.
+  -e, --env stringToString    build environment variables (default [])
+  -h, --help                  help for server
+  -l, --log-level string      log level (default "INFO")
+  -p, --port int              port server will listen (default 8000)
+      --store-url string      store server url (default "http://localhost:9000/store")
+  -v, --verbose               print build process output
 ```
 
 ## SEE ALSO

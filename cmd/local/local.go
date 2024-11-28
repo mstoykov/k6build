@@ -132,7 +132,11 @@ func New() *cobra.Command { //nolint:funlen
 	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")
 	cmd.Flags().StringVarP(&output, "output", "o", "k6", "path to put the binary as an executable.")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "don't print artifact's details")
-	cmd.Flags().BoolVar(&config.AllowPrereleases, "allow-prereleases", false, "allow building pre-releases.")
-
+	cmd.Flags().BoolVar(
+		&config.AllowBuildSemvers,
+		"allow-build-semvers",
+		false,
+		"allow building versions with build metadata (e.g v0.0.0+build).",
+	)
 	return cmd
 }
