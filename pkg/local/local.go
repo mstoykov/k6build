@@ -173,7 +173,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	} else {
 		k6Mod, err = b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
 		if err != nil {
-			return k6build.Artifact{}, err
+			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 		}
 	}
 	resolved[k6Dep] = k6Mod.Version
@@ -182,7 +182,7 @@ func (b *localBuildSrv) Build( //nolint:funlen
 	for _, d := range deps {
 		m, modErr := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
 		if modErr != nil {
-			return k6build.Artifact{}, modErr
+			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, modErr)
 		}
 		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
 		resolved[d.Name] = m.Version
