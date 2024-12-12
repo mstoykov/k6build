@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -105,6 +106,10 @@ func setupStore(preload []object) (store.ObjectStore, error) {
 func TestPutObject(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping test: localstack test container is failing in darwin and windows")
+	}
+
 	preload := []object{
 		{
 			id:      "existing-object",
@@ -191,6 +196,10 @@ func TestPutObject(t *testing.T) {
 
 func TestGetObject(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping test: localstack test container is failing in darwin and windows")
+	}
 
 	preload := []object{
 		{
