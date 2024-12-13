@@ -65,6 +65,12 @@ k6build server -c /path/to/catalog.json
 
 # start the build server using a custom GOPROXY
 k6build server -e GOPROXY=http://localhost:80
+
+# start the build server with a localstack s3 storage backend
+# aws credentials are expected in the default location (e.g. env variables)
+export AWS_ACCESS_KEY_ID="test"
+export AWS_SECRET_ACCESS_KEY="test"
+k6build server --s3-endpoint http://localhost:4566 --store-bucket k6build
 `
 )
 
