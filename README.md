@@ -262,6 +262,9 @@ k6build server -e GOPROXY=http://localhost:80
   -h, --help                  help for server
   -l, --log-level string      log level (default "INFO")
   -p, --port int              port server will listen (default 8000)
+      --s3-endpoint string    s3 endpoint
+      --s3-region string      aws region
+      --store-bucket string   s3 bucket for storing binaries
       --store-url string      store server url (default "http://localhost:9000/store")
   -v, --verbose               print build process output
 ```

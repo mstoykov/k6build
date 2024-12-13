@@ -39,8 +39,36 @@ type Config struct {
 	Bucket string
 	// S3 Client
 	Client *s3.Client
+	// AWS endpoint (used for testing)
+	Endpoint string
+	// AWS Region
+	Region string
 	// Expiration for the presigned download URLs
 	URLExpiration time.Duration
+}
+
+// returns the S3 client options
+func (c Config) s3Opts() []func(o *s3.Options) {
+	opts := []func(o *s3.Options){}
+
+	if c.Endpoint != "" {
+		opts = append(opts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(c.Endpoint)
+			o.UsePathStyle = true
+		})
+	}
+	return opts
+}
+
+// returns the aws configuration load options from Config
+func (c Config) awsOpts() []func(*config.LoadOptions) error {
+	opts := []func(*config.LoadOptions) error{}
+
+	if c.Region != "" {
+		opts = append(opts, config.WithRegion(c.Region))
+	}
+
+	return opts
 }
 
 // WithExpiration sets the expiration for the presigned URL
@@ -58,12 +86,11 @@ func New(conf Config) (store.ObjectStore, error) {
 
 	client := conf.Client
 	if client == nil {
-		// TODO: allow passing the AWS configuration in the Config
-		cfg, err := config.LoadDefaultConfig(context.TODO())
+		cfg, err := config.LoadDefaultConfig(context.TODO(), conf.awsOpts()...)
 		if err != nil {
 			return nil, k6build.NewWrappedError(store.ErrInitializingStore, err)
 		}
-		client = s3.NewFromConfig(cfg)
+		client = s3.NewFromConfig(cfg, conf.s3Opts()...)
 	}
 
 	expiration := conf.URLExpiration
