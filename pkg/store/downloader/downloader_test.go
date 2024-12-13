@@ -11,10 +11,15 @@ import (
 	"testing"
 
 	"github.com/grafana/k6build/pkg/store"
+	"github.com/grafana/k6build/pkg/util"
 )
 
 func fileURL(dir string, path string) string {
-	return "file://" + filepath.Join(dir, path)
+	url, err := util.URLFromFilePath(filepath.Join(dir, path))
+	if err != nil {
+		panic(err)
+	}
+	return url.String()
 }
 
 func httpURL(srv *httptest.Server, path string) string {
