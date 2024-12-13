@@ -54,7 +54,7 @@ k6build local -k v0.50.0 -e GOPROXY=http://localhost:80 -q
 // New creates new cobra command for local build command.
 func New() *cobra.Command { //nolint:funlen
 	var (
-		config   local.BuildServiceConfig
+		config   local.Config
 		deps     []string
 		k6       string
 		output   string
@@ -127,9 +127,9 @@ func New() *cobra.Command { //nolint:funlen
 	_ = cmd.MarkFlagRequired("platform")
 	cmd.Flags().StringVarP(&config.Catalog, "catalog", "c", k6catalog.DefaultCatalogURL, "dependencies catalog")
 	cmd.Flags().StringVarP(&config.StoreDir, "store-dir", "f", "/tmp/k6build/store", "object store dir")
-	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
+	cmd.Flags().BoolVarP(&config.Opts.Verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
-	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")
+	cmd.Flags().StringToStringVarP(&config.Opts.Env, "env", "e", nil, "build environment variables")
 	cmd.Flags().StringVarP(&output, "output", "o", "k6", "path to put the binary as an executable.")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "don't print artifact's details")
 	cmd.Flags().BoolVar(
