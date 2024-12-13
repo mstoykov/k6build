@@ -9,8 +9,10 @@ import (
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/builder"
-	server "github.com/grafana/k6build/pkg/server"
-	store "github.com/grafana/k6build/pkg/store/client"
+	"github.com/grafana/k6build/pkg/server"
+	"github.com/grafana/k6build/pkg/store"
+	"github.com/grafana/k6build/pkg/store/client"
+	"github.com/grafana/k6build/pkg/store/s3"
 	"github.com/grafana/k6catalog"
 
 	"github.com/spf13/cobra"
@@ -69,15 +71,18 @@ k6build server -e GOPROXY=http://localhost:80
 // New creates new cobra command for the server command.
 func New() *cobra.Command { //nolint:funlen
 	var (
+		allowBuildSemvers bool
+		catalogURL        string
+		copyGoEnv         bool
+		enableCgo         bool
+		goEnv             map[string]string
 		logLevel          string
 		port              int
-		enableCgo         bool
-		verbose           bool
-		goEnv             map[string]string
-		copyGoEnv         bool
-		catalogURL        string
+		s3Bucket          string
+		s3Endpoint        string
+		s3Region          string
 		storeURL          string
-		allowBuildSemvers bool
+		verbose           bool
 	)
 
 	cmd := &cobra.Command{
@@ -110,11 +115,24 @@ func New() *cobra.Command { //nolint:funlen
 				return fmt.Errorf("creating catalog %w", err)
 			}
 
-			store, err := store.NewStoreClient(store.StoreClientConfig{
-				Server: storeURL,
-			})
-			if err != nil {
-				return fmt.Errorf("creating store %w", err)
+			var store store.ObjectStore
+
+			if s3Bucket != "" {
+				store, err = s3.New(s3.Config{
+					Bucket:   s3Bucket,
+					Endpoint: s3Endpoint,
+					Region:   s3Region,
+				})
+				if err != nil {
+					return fmt.Errorf("creating s3 store %w", err)
+				}
+			} else {
+				store, err = client.NewStoreClient(client.StoreClientConfig{
+					Server: storeURL,
+				})
+				if err != nil {
+					return fmt.Errorf("creating store %w", err)
+				}
 			}
 
 			// TODO: check this logic
@@ -174,6 +192,9 @@ func New() *cobra.Command { //nolint:funlen
 			"\n",
 	)
 	cmd.Flags().StringVar(&storeURL, "store-url", "http://localhost:9000/store", "store server url")
+	cmd.Flags().StringVar(&s3Bucket, "store-bucket", "", "s3 bucket for storing binaries")
+	cmd.Flags().StringVar(&s3Endpoint, "s3-endpoint", "", "s3 endpoint")
+	cmd.Flags().StringVar(&s3Region, "s3-region", "", "aws region")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
 	cmd.Flags().BoolVarP(&copyGoEnv, "copy-go-env", "g", true, "copy go environment")
 	cmd.Flags().StringToStringVarP(&goEnv, "env", "e", nil, "build environment variables")
