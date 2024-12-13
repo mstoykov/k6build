@@ -8,8 +8,9 @@ import (
 	"os"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6build/pkg/local"
+	"github.com/grafana/k6build/pkg/builder"
 	server "github.com/grafana/k6build/pkg/server"
+	store "github.com/grafana/k6build/pkg/store/client"
 	"github.com/grafana/k6catalog"
 
 	"github.com/spf13/cobra"
@@ -68,10 +69,15 @@ k6build server -e GOPROXY=http://localhost:80
 // New creates new cobra command for the server command.
 func New() *cobra.Command { //nolint:funlen
 	var (
-		config    local.BuildServiceConfig
-		logLevel  string
-		port      int
-		enableCgo bool
+		logLevel          string
+		port              int
+		enableCgo         bool
+		verbose           bool
+		goEnv             map[string]string
+		copyGoEnv         bool
+		catalogURL        string
+		storeURL          string
+		allowBuildSemvers bool
 	)
 
 	cmd := &cobra.Command{
@@ -99,16 +105,41 @@ func New() *cobra.Command { //nolint:funlen
 				),
 			)
 
+			catalog, err := k6catalog.NewCatalog(cmd.Context(), catalogURL)
+			if err != nil {
+				return fmt.Errorf("creating catalog %w", err)
+			}
+
+			store, err := store.NewStoreClient(store.StoreClientConfig{
+				Server: storeURL,
+			})
+			if err != nil {
+				return fmt.Errorf("creating store %w", err)
+			}
+
+			// TODO: check this logic
 			if enableCgo {
 				log.Warn("enabling CGO for build service")
 			} else {
-				if config.BuildEnv == nil {
-					config.BuildEnv = make(map[string]string)
+				if goEnv == nil {
+					goEnv = make(map[string]string)
 				}
-				config.BuildEnv["CGO_ENABLED"] = "0"
+				goEnv["CGO_ENABLED"] = "0"
 			}
 
-			buildSrv, err := local.NewBuildService(cmd.Context(), config)
+			config := builder.Config{
+				Opts: builder.Opts{
+					GoOpts: builder.GoOpts{
+						Env:       goEnv,
+						CopyGoEnv: copyGoEnv,
+					},
+					Verbose:           verbose,
+					AllowBuildSemvers: allowBuildSemvers,
+				},
+				Catalog: catalog,
+				Store:   store,
+			}
+			buildSrv, err := builder.New(cmd.Context(), config)
 			if err != nil {
 				return fmt.Errorf("creating local build service  %w", err)
 			}
@@ -135,22 +166,22 @@ func New() *cobra.Command { //nolint:funlen
 	}
 
 	cmd.Flags().StringVarP(
-		&config.Catalog,
+		&catalogURL,
 		"catalog",
 		"c",
 		k6catalog.DefaultCatalogURL,
 		"dependencies catalog. Can be path to a local file or an URL."+
 			"\n",
 	)
-	cmd.Flags().StringVar(&config.StoreURL, "store-url", "http://localhost:9000/store", "store server url")
-	cmd.Flags().BoolVarP(&config.Verbose, "verbose", "v", false, "print build process output")
-	cmd.Flags().BoolVarP(&config.CopyGoEnv, "copy-go-env", "g", true, "copy go environment")
-	cmd.Flags().StringToStringVarP(&config.BuildEnv, "env", "e", nil, "build environment variables")
+	cmd.Flags().StringVar(&storeURL, "store-url", "http://localhost:9000/store", "store server url")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
+	cmd.Flags().BoolVarP(&copyGoEnv, "copy-go-env", "g", true, "copy go environment")
+	cmd.Flags().StringToStringVarP(&goEnv, "env", "e", nil, "build environment variables")
 	cmd.Flags().IntVarP(&port, "port", "p", 8000, "port server will listen")
 	cmd.Flags().StringVarP(&logLevel, "log-level", "l", "INFO", "log level")
 	cmd.Flags().BoolVar(&enableCgo, "enable-cgo", false, "enable CGO for building binaries.")
 	cmd.Flags().BoolVar(
-		&config.AllowBuildSemvers,
+		&allowBuildSemvers,
 		"allow-build-semvers",
 		false,
 		"allow building versions with build metadata (e.g v0.0.0+build).",

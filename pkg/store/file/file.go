@@ -118,7 +118,10 @@ func (f *Store) Get(_ context.Context, id string) (store.Object, error) {
 		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
 	}
 
-	objectURL, _ := util.URLFromFilePath(filepath.Join(objectDir, "data"))
+	objectURL, err := util.URLFromFilePath(filepath.Join(objectDir, "data"))
+	if err != nil {
+		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
+	}
 	return store.Object{
 		ID:       id,
 		Checksum: string(checksum),

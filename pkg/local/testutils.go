@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/builder"
 	"github.com/grafana/k6build/pkg/store/file"
 	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
@@ -61,24 +62,6 @@ func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
 
 	goproxySrv := httptest.NewServer(proxy)
 
-	opts := k6foundry.NativeBuilderOpts{
-		GoOpts: k6foundry.GoOpts{
-			CopyGoEnv: true,
-			Env: map[string]string{
-				"GOPROXY":   goproxySrv.URL,
-				"GONOPROXY": "none",
-				"GOPRIVATE": "go.k6.io",
-				"GONOSUMDB": "go.k6.io",
-			},
-			TmpCache: true,
-		},
-	}
-
-	builder, err := k6foundry.NewNativeBuilder(context.Background(), opts)
-	if err != nil {
-		return nil, fmt.Errorf("setting up test builder %w", err)
-	}
-
 	catalog, err := k6catalog.NewCatalogFromFile("testdata/catalog.json")
 	if err != nil {
 		return nil, fmt.Errorf("setting up test builder %w", err)
@@ -89,11 +72,20 @@ func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
 		return nil, fmt.Errorf("creating temporary object store %w", err)
 	}
 
-	buildsrv := &localBuildSrv{
-		builder: builder,
-		catalog: catalog,
-		store:   store,
-	}
-
-	return buildsrv, nil
+	return builder.New(context.Background(), builder.Config{
+		Opts: builder.Opts{
+			GoOpts: k6foundry.GoOpts{
+				CopyGoEnv: true,
+				Env: map[string]string{
+					"GOPROXY":   goproxySrv.URL,
+					"GONOPROXY": "none",
+					"GOPRIVATE": "go.k6.io",
+					"GONOSUMDB": "go.k6.io",
+				},
+				TmpCache: true,
+			},
+		},
+		Catalog: catalog,
+		Store:   store,
+	})
 }
