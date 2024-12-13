@@ -3,81 +3,23 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
-	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/store/api"
+	"github.com/grafana/k6build/pkg/store/file"
 )
-
-// MemoryStore implements a memory backed object store
-type MemoryStore struct {
-	objects map[string]store.Object
-	content map[string][]byte
-}
-
-func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{
-		objects: map[string]store.Object{},
-		content: map[string][]byte{},
-	}
-}
-
-func (f *MemoryStore) Get(_ context.Context, id string) (store.Object, error) {
-	object, found := f.objects[id]
-	if !found {
-		return store.Object{}, store.ErrObjectNotFound
-	}
-
-	return object, nil
-}
-
-func (f *MemoryStore) Put(_ context.Context, id string, content io.Reader) (store.Object, error) {
-	buffer := bytes.Buffer{}
-	_, err := buffer.ReadFrom(content)
-	if err != nil {
-		return store.Object{}, store.ErrCreatingObject
-	}
-
-	checksum := fmt.Sprintf("%x", sha256.Sum256(buffer.Bytes()))
-	object := store.Object{
-		ID:       id,
-		Checksum: checksum,
-		URL:      fmt.Sprintf("memory:///%s", id),
-	}
-
-	f.objects[id] = object
-	f.content[id] = buffer.Bytes()
-
-	return object, nil
-}
-
-func (f *MemoryStore) Download(_ context.Context, object store.Object) (io.ReadCloser, error) {
-	url, err := url.Parse(object.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	id, _ := strings.CutPrefix(url.Path, "/")
-	content, found := f.content[id]
-	if !found {
-		return nil, store.ErrObjectNotFound
-	}
-
-	return io.NopCloser(bytes.NewBuffer(content)), nil
-}
 
 func TestStoreServerGet(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore()
+	store, err := file.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("creating test file store %v", err)
+	}
 	objects := map[string][]byte{
 		"object1": []byte("content object 1"),
 	}
@@ -155,7 +97,10 @@ func TestStoreServerGet(t *testing.T) {
 func TestStoreServerPut(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore()
+	store, err := file.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("creating test file store %v", err)
+	}
 
 	config := StoreServerConfig{
 		Store: store,
@@ -223,7 +168,11 @@ func TestStoreServerPut(t *testing.T) {
 func TestStoreServerDownload(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore()
+	store, err := file.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("creating test file store %v", err)
+	}
+
 	objects := map[string][]byte{
 		"object1": []byte("content object 1"),
 	}

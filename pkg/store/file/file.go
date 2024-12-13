@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,51 +126,6 @@ func (f *Store) Get(_ context.Context, id string) (store.Object, error) {
 		Checksum: string(checksum),
 		URL:      objectURL.String(),
 	}, nil
-}
-
-// Download returns the content of the object given its url
-func (f *Store) Download(_ context.Context, object store.Object) (io.ReadCloser, error) {
-	url, err := url.Parse(object.URL)
-	if err != nil {
-		return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
-	}
-
-	switch url.Scheme {
-	case "file":
-		objectPath, err := util.URLToFilePath(url)
-		if err != nil {
-			return nil, err
-		}
-
-		// prevent malicious path
-		objectPath, err = f.sanitizePath(objectPath)
-		if err != nil {
-			return nil, err
-		}
-
-		objectFile, err := os.Open(objectPath) //nolint:gosec // path is sanitized
-		if err != nil {
-			// FIXME: is the path has invalid characters, still will return ErrNotExists
-			if errors.Is(err, os.ErrNotExist) {
-				return nil, store.ErrObjectNotFound
-			}
-			return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
-		}
-
-		return objectFile, nil
-	default:
-		return nil, fmt.Errorf("%w unsupported schema: %s", store.ErrInvalidURL, url.Scheme)
-	}
-}
-
-func (f *Store) sanitizePath(path string) (string, error) {
-	path = filepath.Clean(path)
-
-	if !filepath.IsAbs(path) || !strings.HasPrefix(path, f.dir) {
-		return "", fmt.Errorf("%w : invalid path %s", store.ErrInvalidURL, path)
-	}
-
-	return path, nil
 }
 
 // lockObject obtains a mutex used to prevent concurrent builds of the same artifact and
