@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -176,29 +175,6 @@ func (s *Store) Get(ctx context.Context, id string) (store.Object, error) {
 		Checksum: *obj.Checksum.ChecksumSHA256,
 		URL:      url,
 	}, nil
-}
-
-// Download returns the content of the object given its url
-func (s *Store) Download(ctx context.Context, object store.Object) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, object.URL, nil)
-	if err != nil {
-		return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, k6build.NewWrappedError(store.ErrAccessingObject, fmt.Errorf("HTTP response: %s", resp.Status))
-	}
-
-	return resp.Body, nil
 }
 
 func (s *Store) getDownloadURL(ctx context.Context, id string) (string, error) {

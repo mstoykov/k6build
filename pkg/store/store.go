@@ -13,8 +13,9 @@ var (
 	ErrAccessingObject   = errors.New("accessing object")   //nolint:revive
 	ErrCreatingObject    = errors.New("creating object")    //nolint:revive
 	ErrInitializingStore = errors.New("initializing store") //nolint:revive
-	ErrObjectNotFound    = errors.New("object not found")   //nolint:revive
 	ErrInvalidURL        = errors.New("invalid object URL") //nolint:revive
+	ErrObjectNotFound    = errors.New("object not found")   //nolint:revive
+	ErrNotSupported      = errors.New("not supported")      //nolint:revive
 
 )
 
@@ -42,6 +43,4 @@ type ObjectStore interface {
 	Get(ctx context.Context, id string) (Object, error)
 	// Put stores the object and returns the metadata
 	Put(ctx context.Context, id string, content io.Reader) (Object, error)
-	// Download returns the content of the object
-	Download(ctx context.Context, object Object) (io.ReadCloser, error)
 }

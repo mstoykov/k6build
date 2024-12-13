@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/store/api"
+	"github.com/grafana/k6build/pkg/store/downloader"
 )
 
 // StoreServer implements an http server that handles object store requests
@@ -162,7 +163,7 @@ func (s *StoreServer) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectContent, err := s.store.Download(context.Background(), object) //nolint:contextcheck
+	objectContent, err := downloader.Download(context.Background(), object) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
