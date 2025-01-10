@@ -100,7 +100,7 @@ func New() *cobra.Command {
 			srv.Handle("/store/", http.StripPrefix("/store", storeSrv))
 
 			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
-			log.Info("starting server", "address", listerAddr)
+			log.Info("starting server", "address", listerAddr, "object store", storeDir)
 			err = http.ListenAndServe(listerAddr, srv) //nolint:gosec
 			if err != nil {
 				log.Info("server ended", "error", err.Error())
@@ -111,7 +111,7 @@ func New() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&storeDir, "store-dir", "c", "/tmp/store/objectstore", "object store directory")
+	cmd.Flags().StringVarP(&storeDir, "store-dir", "c", "/tmp/k6build/store", "object store directory")
 	cmd.Flags().IntVarP(&port, "port", "p", 9000, "port server will listen")
 	cmd.Flags().StringVarP(&storeSrvURL,
 		"download-url", "d", "", "base url used for downloading objects."+
