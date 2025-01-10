@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/k6build"
-	"github.com/grafana/k6catalog"
+	"github.com/grafana/k6build/pkg/catalog"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -45,7 +45,7 @@ func TestDependencyResolution(t *testing.T) {
 			title:     "build unsatisfied k6 constrain (>v0.2.0)",
 			k6:        ">v0.2.0",
 			deps:      []k6build.Dependency{},
-			expectErr: k6catalog.ErrCannotSatisfy,
+			expectErr: catalog.ErrCannotSatisfy,
 		},
 		{
 			title:     "build k6 v0.1.0 exact dependency constraint",
@@ -63,7 +63,7 @@ func TestDependencyResolution(t *testing.T) {
 			title:     "build k6 v0.1.0 unsatisfied dependency constrain",
 			k6:        "v0.1.0",
 			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: ">v0.2.0"}},
-			expectErr: k6catalog.ErrCannotSatisfy,
+			expectErr: catalog.ErrCannotSatisfy,
 		},
 	}
 

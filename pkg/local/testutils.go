@@ -8,14 +8,14 @@ import (
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/builder"
+	"github.com/grafana/k6build/pkg/catalog"
 	"github.com/grafana/k6build/pkg/store/file"
-	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
 	"github.com/grafana/k6foundry/pkg/testutils/goproxy"
 )
 
 // DependencyComp compares two dependencies for ordering
-func DependencyComp(a, b k6catalog.Module) bool { return a.Path < b.Path }
+func DependencyComp(a, b catalog.Module) bool { return a.Path < b.Path }
 
 // SetupTestLocalBuildService setups a local build service for testing
 func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
@@ -62,7 +62,7 @@ func SetupTestLocalBuildService(t *testing.T) (k6build.BuildService, error) {
 
 	goproxySrv := httptest.NewServer(proxy)
 
-	catalog, err := k6catalog.NewCatalogFromFile("testdata/catalog.json")
+	catalog, err := catalog.NewCatalogFromFile("testdata/catalog.json")
 	if err != nil {
 		return nil, fmt.Errorf("setting up test builder %w", err)
 	}

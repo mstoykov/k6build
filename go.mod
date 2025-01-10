@@ -3,13 +3,13 @@ module github.com/grafana/k6build
 go 1.22.2
 
 require (
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/aws/aws-sdk-go-v2 v1.32.8
 	github.com/aws/aws-sdk-go-v2/config v1.28.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.51
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.72.0
 	github.com/docker/go-connections v0.5.0
 	github.com/grafana/clireadme v0.1.0
-	github.com/grafana/k6catalog v0.2.4
 	github.com/grafana/k6foundry v0.3.0
 	github.com/spf13/cobra v1.8.1
 	github.com/testcontainers/testcontainers-go/modules/localstack v0.35.0
@@ -18,7 +18,6 @@ require (
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
-	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.7 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.23 // indirect

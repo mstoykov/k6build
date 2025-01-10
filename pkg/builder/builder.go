@@ -13,8 +13,8 @@ import (
 	"sync"
 
 	"github.com/grafana/k6build"
+	"github.com/grafana/k6build/pkg/catalog"
 	"github.com/grafana/k6build/pkg/store"
-	"github.com/grafana/k6catalog"
 	"github.com/grafana/k6foundry"
 )
 
@@ -53,14 +53,14 @@ type Opts struct {
 // Config defines the configuration for a Builder
 type Config struct {
 	Opts    Opts
-	Catalog k6catalog.Catalog
+	Catalog catalog.Catalog
 	Store   store.ObjectStore
 }
 
 // Builder implements the BuildService interface
 type Builder struct {
 	allowBuildSemvers bool
-	catalog           k6catalog.Catalog
+	catalog           catalog.Catalog
 	builder           k6foundry.Builder
 	store             store.ObjectStore
 	mutexes           sync.Map
@@ -121,7 +121,7 @@ func (b *Builder) Build( //nolint:funlen
 	// the build metadata as version when building this module
 	// the build process will return the actual version built in the build info
 	// and we can check that version with the catalog
-	var k6Mod k6catalog.Module
+	var k6Mod catalog.Module
 	buildMetadata, err := hasBuildMetadata(k6Constrains)
 	if err != nil {
 		return k6build.Artifact{}, err
@@ -130,9 +130,9 @@ func (b *Builder) Build( //nolint:funlen
 		if !b.allowBuildSemvers {
 			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, ErrBuildSemverNotAllowed)
 		}
-		k6Mod = k6catalog.Module{Path: k6Path, Version: buildMetadata}
+		k6Mod = catalog.Module{Path: k6Path, Version: buildMetadata}
 	} else {
-		k6Mod, err = b.catalog.Resolve(ctx, k6catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
+		k6Mod, err = b.catalog.Resolve(ctx, catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
 		if err != nil {
 			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 		}
@@ -141,7 +141,7 @@ func (b *Builder) Build( //nolint:funlen
 
 	mods := []k6foundry.Module{}
 	for _, d := range deps {
-		m, modErr := b.catalog.Resolve(ctx, k6catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
+		m, modErr := b.catalog.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
 		if modErr != nil {
 			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, modErr)
 		}
