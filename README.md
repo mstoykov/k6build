@@ -332,7 +332,7 @@ curl http://external.url:9000/store/objectID/download
   -h, --help                  help for store
   -l, --log-level string      log level (default "INFO")
   -p, --port int              port server will listen (default 9000)
-  -c, --store-dir string      object store directory (default "/tmp/store/objectstore")
+  -c, --store-dir string      object store directory (default "/tmp/k6build/store")
 ```
 
 ## SEE ALSO
