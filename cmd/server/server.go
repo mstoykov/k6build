@@ -9,11 +9,11 @@ import (
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/builder"
+	"github.com/grafana/k6build/pkg/catalog"
 	"github.com/grafana/k6build/pkg/server"
 	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/store/client"
 	"github.com/grafana/k6build/pkg/store/s3"
-	"github.com/grafana/k6catalog"
 
 	"github.com/spf13/cobra"
 )
@@ -116,7 +116,7 @@ func New() *cobra.Command { //nolint:funlen
 				),
 			)
 
-			catalog, err := k6catalog.NewCatalog(cmd.Context(), catalogURL)
+			catalog, err := catalog.NewCatalog(cmd.Context(), catalogURL)
 			if err != nil {
 				return fmt.Errorf("creating catalog %w", err)
 			}
@@ -193,7 +193,7 @@ func New() *cobra.Command { //nolint:funlen
 		&catalogURL,
 		"catalog",
 		"c",
-		k6catalog.DefaultCatalogURL,
+		catalog.DefaultCatalogURL,
 		"dependencies catalog. Can be path to a local file or an URL."+
 			"\n",
 	)

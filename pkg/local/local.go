@@ -6,8 +6,8 @@ import (
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/builder"
+	"github.com/grafana/k6build/pkg/catalog"
 	"github.com/grafana/k6build/pkg/store/file"
-	"github.com/grafana/k6catalog"
 )
 
 // Opts local builder options
@@ -27,7 +27,7 @@ type Config struct {
 
 // NewBuildService creates a local build service using the given configuration
 func NewBuildService(ctx context.Context, config Config) (k6build.BuildService, error) {
-	catalog, err := k6catalog.NewCatalog(ctx, config.Catalog)
+	catalog, err := catalog.NewCatalog(ctx, config.Catalog)
 	if err != nil {
 		return nil, k6build.NewWrappedError(builder.ErrInitializingBuilder, err)
 	}
