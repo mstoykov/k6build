@@ -2,6 +2,13 @@ version: 2
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
+    groups:
+      aws:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2/*"
+      test:
+        patterns:
+          - "github.com/testcontainers/*"
     schedule:
       interval: "weekly"
       day: "sunday"
