@@ -122,6 +122,7 @@ func (b *Builder) Build( //nolint:funlen
 	resolved[k6Dep] = k6Mod.Version
 
 	mods := []k6foundry.Module{}
+	cgoEnabled := false
 	for _, d := range deps {
 		m, modErr := b.catalog.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
 		if modErr != nil {
@@ -129,6 +130,7 @@ func (b *Builder) Build( //nolint:funlen
 		}
 		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
 		resolved[d.Name] = m.Version
+		cgoEnabled = cgoEnabled || m.Cgo
 	}
 
 	// generate id form sorted list of dependencies
@@ -158,9 +160,18 @@ func (b *Builder) Build( //nolint:funlen
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
+	// set CGO_ENABLED if any of the dependencies require it
+	env := b.opts.Env
+	if cgoEnabled {
+		if env == nil {
+			env = map[string]string{}
+		}
+		env["CGO_ENABLED"] = "1"
+	}
+
 	builderOpts := k6foundry.NativeBuilderOpts{
 		GoOpts: k6foundry.GoOpts{
-			Env:       b.opts.Env,
+			Env:       env,
 			CopyGoEnv: b.opts.CopyGoEnv,
 		},
 	}
