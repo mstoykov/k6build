@@ -113,20 +113,14 @@ func (r *BuildClient) Build(
 		_ = resp.Body.Close()
 	}()
 
+	if resp.StatusCode != http.StatusOK {
+		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, errors.New(resp.Status))
+	}
+
 	buildResponse := api.BuildResponse{}
 	err = json.NewDecoder(resp.Body).Decode(&buildResponse)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		// if an error occurred (e.g. internal server error) the Error may not be available
-		if buildResponse.Error == nil {
-			return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, errors.New(resp.Status))
-		}
-
-		// we expect the Error to have an api.Error we we don't wrap it again
-		return k6build.Artifact{}, buildResponse.Error
 	}
 
 	if buildResponse.Error != nil {
