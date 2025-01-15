@@ -25,26 +25,25 @@ type StoreClientConfig struct {
 
 // StoreClient access blobs in a StoreServer
 type StoreClient struct {
-	server string
+	server *url.URL
 }
 
 // NewStoreClient returns a client for an object store server
 func NewStoreClient(config StoreClientConfig) (*StoreClient, error) {
-	if _, err := url.Parse(config.Server); err != nil {
+	srvURL, err := url.Parse(config.Server)
+	if err != nil {
 		return nil, k6build.NewWrappedError(ErrInvalidConfig, err)
 	}
 
 	return &StoreClient{
-		server: config.Server,
+		server: srvURL,
 	}, nil
 }
 
 // Get retrieves an objects if exists in the store or an error otherwise
 func (c *StoreClient) Get(_ context.Context, id string) (store.Object, error) {
-	url := fmt.Sprintf("%s/%s", c.server, id)
-
-	// TODO: use http.Request
-	resp, err := http.Get(url) //nolint:gosec,noctx
+	reqURL := *c.server.JoinPath(id)
+	resp, err := http.Get(reqURL.String()) //nolint:noctx
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
@@ -74,9 +73,9 @@ func (c *StoreClient) Get(_ context.Context, id string) (store.Object, error) {
 
 // Put stores the object and returns the metadata
 func (c *StoreClient) Put(_ context.Context, id string, content io.Reader) (store.Object, error) {
-	url := fmt.Sprintf("%s/%s", c.server, id)
-	resp, err := http.Post( //nolint:gosec,noctx
-		url,
+	reqURL := *c.server.JoinPath(id)
+	resp, err := http.Post( //nolint:noctx
+		reqURL.String(),
 		"application/octet-stream",
 		content,
 	)

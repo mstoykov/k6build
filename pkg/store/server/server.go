@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/store"
@@ -18,7 +19,7 @@ import (
 
 // StoreServer implements an http server that handles object store requests
 type StoreServer struct {
-	baseURL string
+	baseURL *url.URL
 	store   store.ObjectStore
 	log     *slog.Logger
 }
@@ -31,7 +32,7 @@ type StoreServerConfig struct {
 }
 
 // NewStoreServer returns a StoreServer backed by a file object store
-func NewStoreServer(config StoreServerConfig) http.Handler {
+func NewStoreServer(config StoreServerConfig) (http.Handler, error) {
 	log := config.Log
 
 	if log == nil {
@@ -42,8 +43,19 @@ func NewStoreServer(config StoreServerConfig) http.Handler {
 			),
 		)
 	}
+
+	var (
+		baseURL *url.URL
+		err     error
+	)
+	if config.BaseURL != "" {
+		baseURL, err = url.Parse(config.BaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid configuration %w", err)
+		}
+	}
 	storeSrv := &StoreServer{
-		baseURL: config.BaseURL,
+		baseURL: baseURL,
 		store:   config.Store,
 		log:     log,
 	}
@@ -54,7 +66,7 @@ func NewStoreServer(config StoreServerConfig) http.Handler {
 	handler.HandleFunc("GET /{id}", storeSrv.Get)
 	handler.HandleFunc("GET /{id}/download", storeSrv.Download)
 
-	return handler
+	return handler, nil
 }
 
 // Get retrieves an objects if exists in the object store or an error otherwise
@@ -137,12 +149,12 @@ func (s *StoreServer) Store(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
 }
 
-func getDownloadURL(baseURL string, r *http.Request) string {
-	if baseURL != "" {
-		return fmt.Sprintf("%s/%s/download", baseURL, r.PathValue("id"))
+func getDownloadURL(baseURL *url.URL, r *http.Request) string {
+	if baseURL != nil {
+		return baseURL.JoinPath(r.PathValue("id"), "download").String()
 	}
 
-	return fmt.Sprintf("http://%s%s/download", r.Host, r.RequestURI)
+	return r.URL.JoinPath("download").String()
 }
 
 // Download returns an object's content given its id

@@ -94,7 +94,10 @@ func New() *cobra.Command {
 				Store:   store,
 				Log:     log,
 			}
-			storeSrv := server.NewStoreServer(config)
+			storeSrv, err := server.NewStoreServer(config)
+			if err != nil {
+				return fmt.Errorf("creating store server %w", err)
+			}
 
 			srv := http.NewServeMux()
 			srv.Handle("/store/", http.StripPrefix("/store", storeSrv))

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path/filepath"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/api"
@@ -41,8 +40,13 @@ func NewBuildServiceClient(config BuildServiceClientConfig) (k6build.BuildServic
 	if config.URL == "" {
 		return nil, ErrInvalidConfiguration
 	}
+
+	srvURL, err := url.Parse(config.URL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid server %w", err)
+	}
 	return &BuildClient{
-		srvURL:   config.URL,
+		srvURL:   srvURL,
 		auth:     config.Authorization,
 		authType: config.AuthorizationType,
 		headers:  config.Headers,
@@ -51,7 +55,7 @@ func NewBuildServiceClient(config BuildServiceClientConfig) (k6build.BuildServic
 
 // BuildClient defines a client of a build service
 type BuildClient struct {
-	srvURL   string
+	srvURL   *url.URL
 	authType string
 	auth     string
 	headers  map[string]string
@@ -79,13 +83,8 @@ func (r *BuildClient) Build(
 		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrInvalidRequest, err)
 	}
 
-	url, err := url.Parse(r.srvURL)
-	if err != nil {
-		return k6build.Artifact{}, fmt.Errorf("invalid server %w", err)
-	}
-	url.Path = filepath.Join(url.Path, "build")
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), marshaled)
+	reqURL := r.srvURL.JoinPath("build")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL.String(), marshaled)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
