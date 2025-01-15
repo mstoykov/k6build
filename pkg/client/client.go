@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/api"
@@ -82,7 +83,7 @@ func (r *BuildClient) Build(
 	if err != nil {
 		return k6build.Artifact{}, fmt.Errorf("invalid server %w", err)
 	}
-	url.Path = "/build/"
+	url.Path = filepath.Join(url.Path, "build")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), marshaled)
 	if err != nil {
