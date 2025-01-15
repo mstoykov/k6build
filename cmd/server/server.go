@@ -175,7 +175,7 @@ func New() *cobra.Command { //nolint:funlen
 			buildAPI := server.NewAPIServer(apiConfig)
 
 			srv := http.NewServeMux()
-			srv.Handle("POST /build/", http.StripPrefix("/build", buildAPI))
+			srv.Handle("POST /build", http.StripPrefix("/build", buildAPI))
 
 			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
 			log.Info("starting server", "address", listerAddr)
