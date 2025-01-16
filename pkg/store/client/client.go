@@ -41,9 +41,14 @@ func NewStoreClient(config StoreClientConfig) (*StoreClient, error) {
 }
 
 // Get retrieves an objects if exists in the store or an error otherwise
-func (c *StoreClient) Get(_ context.Context, id string) (store.Object, error) {
+func (c *StoreClient) Get(ctx context.Context, id string) (store.Object, error) {
 	reqURL := *c.server.JoinPath(id)
-	resp, err := http.Get(reqURL.String()) //nolint:noctx
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
+	if err != nil {
+		return store.Object{}, k6build.NewWrappedError(api.ErrInvalidRequest, err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
@@ -72,13 +77,20 @@ func (c *StoreClient) Get(_ context.Context, id string) (store.Object, error) {
 }
 
 // Put stores the object and returns the metadata
-func (c *StoreClient) Put(_ context.Context, id string, content io.Reader) (store.Object, error) {
+func (c *StoreClient) Put(ctx context.Context, id string, content io.Reader) (store.Object, error) {
 	reqURL := *c.server.JoinPath(id)
-	resp, err := http.Post( //nolint:noctx
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
 		reqURL.String(),
-		"application/octet-stream",
 		content,
 	)
+	if err != nil {
+		return store.Object{}, k6build.NewWrappedError(api.ErrInvalidRequest, err)
+	}
+
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
@@ -103,8 +115,13 @@ func (c *StoreClient) Put(_ context.Context, id string, content io.Reader) (stor
 }
 
 // Download returns the content of the object given its url
-func (c *StoreClient) Download(_ context.Context, object store.Object) (io.ReadCloser, error) {
-	resp, err := http.Get(object.URL) //nolint:noctx,bodyclose
+func (c *StoreClient) Download(ctx context.Context, object store.Object) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, object.URL, nil)
+	if err != nil {
+		return nil, k6build.NewWrappedError(api.ErrInvalidRequest, err)
+	}
+
+	resp, err := http.DefaultClient.Do(req) //nolint:bodyclose
 	if err != nil {
 		return nil, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}

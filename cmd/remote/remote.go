@@ -52,7 +52,7 @@ Extensions:
 )
 
 // New creates new cobra command for build client command.
-func New() *cobra.Command {
+func New() *cobra.Command { //nolint:funlen
 	var (
 		config   client.BuildServiceClientConfig
 		deps     []string
@@ -95,8 +95,13 @@ func New() *cobra.Command {
 				fmt.Println(artifact.Print())
 			}
 
-			if output != "" {
-				resp, err := http.Get(artifact.URL) //nolint:noctx
+			// TODO: refactor to use a download function
+			if output != "" { //nolint:nestif
+				req, err := http.NewRequestWithContext(cmd.Context(), http.MethodGet, artifact.URL, nil)
+				if err != nil {
+					return fmt.Errorf("downloading artifact %w", err)
+				}
+				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
 					return fmt.Errorf("downloading artifact %w", err)
 				}
