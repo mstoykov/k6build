@@ -98,7 +98,7 @@ func TestDownload(t *testing.T) {
 			t.Parallel()
 
 			object := store.Object{ID: tc.id, URL: tc.url}
-			content, err := Download(context.TODO(), object)
+			content, err := Download(context.TODO(), http.DefaultClient, object)
 			if !errors.Is(err, tc.expectErr) {
 				t.Fatalf("expected %v got %v", tc.expectErr, err)
 			}

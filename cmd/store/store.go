@@ -85,16 +85,15 @@ func New() *cobra.Command {
 				return fmt.Errorf("creating object store %w", err)
 			}
 
-			// FIXME: this will not work across machines
-			if storeSrvURL == "" {
-				storeSrvURL = fmt.Sprintf("http://localhost:%d/store", port)
-			}
 			config := server.StoreServerConfig{
 				BaseURL: storeSrvURL,
 				Store:   store,
 				Log:     log,
 			}
-			storeSrv := server.NewStoreServer(config)
+			storeSrv, err := server.NewStoreServer(config)
+			if err != nil {
+				return fmt.Errorf("creating store server %w", err)
+			}
 
 			srv := http.NewServeMux()
 			srv.Handle("/store/", http.StripPrefix("/store", storeSrv))

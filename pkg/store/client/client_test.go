@@ -163,7 +163,7 @@ func TestStoreClientDownload(t *testing.T) {
 			content: []byte("object content"),
 		},
 		{
-			title:     "error creating object",
+			title:     "error downloading object",
 			status:    http.StatusInternalServerError,
 			expectErr: api.ErrRequestFailed,
 		},

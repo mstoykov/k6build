@@ -26,7 +26,7 @@ func TestStoreServerGet(t *testing.T) {
 
 	for id, content := range objects {
 		buffer := bytes.NewBuffer(content)
-		if _, err := store.Put(context.TODO(), id, buffer); err != nil {
+		if _, err = store.Put(context.TODO(), id, buffer); err != nil {
 			t.Fatalf("test setup: %v", err)
 		}
 	}
@@ -34,7 +34,10 @@ func TestStoreServerGet(t *testing.T) {
 	config := StoreServerConfig{
 		Store: store,
 	}
-	storeSrv := NewStoreServer(config)
+	storeSrv, err := NewStoreServer(config)
+	if err != nil {
+		t.Fatalf("creating store server %v", err)
+	}
 
 	srv := httptest.NewServer(storeSrv)
 
@@ -105,7 +108,10 @@ func TestStoreServerPut(t *testing.T) {
 	config := StoreServerConfig{
 		Store: store,
 	}
-	storeSrv := NewStoreServer(config)
+	storeSrv, err := NewStoreServer(config)
+	if err != nil {
+		t.Fatalf("creating store server %v", err)
+	}
 
 	srv := httptest.NewServer(storeSrv)
 
@@ -179,7 +185,7 @@ func TestStoreServerDownload(t *testing.T) {
 
 	for id, content := range objects {
 		buffer := bytes.NewBuffer(content)
-		if _, err := store.Put(context.TODO(), id, buffer); err != nil {
+		if _, err = store.Put(context.TODO(), id, buffer); err != nil {
 			t.Fatalf("test setup: %v", err)
 		}
 	}
@@ -187,7 +193,10 @@ func TestStoreServerDownload(t *testing.T) {
 	config := StoreServerConfig{
 		Store: store,
 	}
-	storeSrv := NewStoreServer(config)
+	storeSrv, err := NewStoreServer(config)
+	if err != nil {
+		t.Fatalf("creating store server %v", err)
+	}
 
 	srv := httptest.NewServer(storeSrv)
 
