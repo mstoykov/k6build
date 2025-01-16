@@ -17,7 +17,7 @@ import (
 )
 
 // Download returns the content of the object
-func Download(ctx context.Context, object store.Object) (io.ReadCloser, error) {
+func Download(ctx context.Context, client *http.Client, object store.Object) (io.ReadCloser, error) {
 	url, err := url.Parse(object.URL)
 	if err != nil {
 		return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
@@ -52,7 +52,7 @@ func Download(ctx context.Context, object store.Object) (io.ReadCloser, error) {
 			return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, k6build.NewWrappedError(store.ErrAccessingObject, err)
 		}

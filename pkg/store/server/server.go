@@ -22,13 +22,15 @@ type StoreServer struct {
 	baseURL *url.URL
 	store   store.ObjectStore
 	log     *slog.Logger
+	client  *http.Client
 }
 
 // StoreServerConfig defines the configuration for the APIServer
 type StoreServerConfig struct {
-	BaseURL string
-	Store   store.ObjectStore
-	Log     *slog.Logger
+	BaseURL    string
+	Store      store.ObjectStore
+	Log        *slog.Logger
+	HTTPClient *http.Client
 }
 
 // NewStoreServer returns a StoreServer backed by a file object store
@@ -54,10 +56,16 @@ func NewStoreServer(config StoreServerConfig) (http.Handler, error) {
 			return nil, fmt.Errorf("invalid configuration %w", err)
 		}
 	}
+
+	client := config.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
 	storeSrv := &StoreServer{
 		baseURL: baseURL,
 		store:   config.Store,
 		log:     log,
+		client:  client,
 	}
 
 	handler := http.NewServeMux()
@@ -175,7 +183,7 @@ func (s *StoreServer) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectContent, err := downloader.Download(context.Background(), object) //nolint:contextcheck
+	objectContent, err := downloader.Download(context.Background(), s.client, object) //nolint:contextcheck
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

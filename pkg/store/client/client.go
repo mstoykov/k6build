@@ -20,12 +20,14 @@ var ErrInvalidConfig = errors.New("invalid configuration")
 
 // StoreClientConfig defines the configuration for accessing a remote object store service
 type StoreClientConfig struct {
-	Server string
+	Server     string
+	HTTPClient *http.Client
 }
 
 // StoreClient access blobs in a StoreServer
 type StoreClient struct {
 	server *url.URL
+	client *http.Client
 }
 
 // NewStoreClient returns a client for an object store server
@@ -35,8 +37,13 @@ func NewStoreClient(config StoreClientConfig) (*StoreClient, error) {
 		return nil, k6build.NewWrappedError(ErrInvalidConfig, err)
 	}
 
+	client := config.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
 	return &StoreClient{
 		server: srvURL,
+		client: client,
 	}, nil
 }
 
@@ -48,7 +55,7 @@ func (c *StoreClient) Get(ctx context.Context, id string) (store.Object, error) 
 		return store.Object{}, k6build.NewWrappedError(api.ErrInvalidRequest, err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
@@ -90,7 +97,7 @@ func (c *StoreClient) Put(ctx context.Context, id string, content io.Reader) (st
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
@@ -121,7 +128,7 @@ func (c *StoreClient) Download(ctx context.Context, object store.Object) (io.Rea
 		return nil, k6build.NewWrappedError(api.ErrInvalidRequest, err)
 	}
 
-	resp, err := http.DefaultClient.Do(req) //nolint:bodyclose
+	resp, err := c.client.Do(req) //nolint:bodyclose
 	if err != nil {
 		return nil, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}

@@ -33,6 +33,8 @@ type BuildServiceClientConfig struct {
 	AuthorizationType string
 	// Headers custom request headers
 	Headers map[string]string
+	// HTTPClient custom http client
+	HTTPClient *http.Client
 }
 
 // NewBuildServiceClient returns a new client for a remote build service
@@ -45,11 +47,17 @@ func NewBuildServiceClient(config BuildServiceClientConfig) (k6build.BuildServic
 	if err != nil {
 		return nil, fmt.Errorf("invalid server %w", err)
 	}
+
+	client := config.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
 	return &BuildClient{
 		srvURL:   srvURL,
 		auth:     config.Authorization,
 		authType: config.AuthorizationType,
 		headers:  config.Headers,
+		client:   client,
 	}, nil
 }
 
@@ -59,6 +67,7 @@ type BuildClient struct {
 	authType string
 	auth     string
 	headers  map[string]string
+	client   *http.Client
 }
 
 // Build request building an artifact to a build service
@@ -104,7 +113,7 @@ func (r *BuildClient) Build(
 		req.Header.Add(h, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(api.ErrRequestFailed, err)
 	}
