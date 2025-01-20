@@ -16,7 +16,7 @@ type metrics struct {
 func newMetrics() *metrics {
 	requestCounter := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
-		Name:      "request_total",
+		Name:      "requests_total",
 		Help:      "The total number of builds requests",
 	})
 
