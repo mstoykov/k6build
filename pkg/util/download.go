@@ -27,13 +27,16 @@ func Download(ctx context.Context, url string, output string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%w %w", ErrDownloadFailed, err)
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	outFile, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE, 0o755) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("%w %w", ErrWritingFile, err)
 	}
 	defer func() {
-		_ = resp.Body.Close()
+		_ = outFile.Close()
 	}()
 
 	_, err = io.Copy(outFile, resp.Body)
