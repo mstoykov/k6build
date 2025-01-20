@@ -22,6 +22,10 @@ lint: format
 test:
 	go test -race  ./...
 
+.PHONY: integration
+integration:
+	go test -tags integration -race  ./integration/...
+
 .PHONY: readme
 readme:
 	go run ./tools/gendoc README.md
