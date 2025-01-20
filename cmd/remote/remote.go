@@ -3,13 +3,11 @@ package remote
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"strings"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/client"
+	"github.com/grafana/k6build/pkg/util"
 
 	"github.com/spf13/cobra"
 )
@@ -52,7 +50,7 @@ Extensions:
 )
 
 // New creates new cobra command for build client command.
-func New() *cobra.Command { //nolint:funlen
+func New() *cobra.Command {
 	var (
 		config   client.BuildServiceClientConfig
 		deps     []string
@@ -95,32 +93,10 @@ func New() *cobra.Command { //nolint:funlen
 				fmt.Println(artifact.Print())
 			}
 
-			// TODO: refactor to use a download function
-			if output != "" { //nolint:nestif
-				req, err := http.NewRequestWithContext(cmd.Context(), http.MethodGet, artifact.URL, nil)
+			if output != "" {
+				err = util.Download(cmd.Context(), artifact.URL, output)
 				if err != nil {
 					return fmt.Errorf("downloading artifact %w", err)
-				}
-				resp, err := http.DefaultClient.Do(req)
-				if err != nil {
-					return fmt.Errorf("downloading artifact %w", err)
-				}
-
-				if resp.StatusCode != http.StatusOK {
-					return fmt.Errorf("request failed with status %s", resp.Status)
-				}
-
-				outFile, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE, 0o755) //nolint:gosec
-				if err != nil {
-					return fmt.Errorf("opening output file %w", err)
-				}
-				defer func() {
-					_ = resp.Body.Close()
-				}()
-
-				_, err = io.Copy(outFile, resp.Body)
-				if err != nil {
-					return fmt.Errorf("copying artifact %w", err)
 				}
 			}
 
