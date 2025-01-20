@@ -162,7 +162,18 @@ func getDownloadURL(baseURL *url.URL, r *http.Request) string {
 		return baseURL.JoinPath("store", r.PathValue("id"), "download").String()
 	}
 
-	return r.URL.JoinPath("download").String()
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	url := url.URL{
+		Scheme: scheme,
+		Host:   r.Host,
+		Path:   r.URL.JoinPath("download").String(),
+	}
+
+	return url.String()
 }
 
 // Download returns an object's content given its id
