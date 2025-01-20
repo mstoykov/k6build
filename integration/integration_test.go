@@ -24,6 +24,7 @@ import (
 func Test_BuildServer(t *testing.T) {
 	t.Parallel()
 
+	// 1. setup a file store
 	store, err := filestore.NewFileStore(filepath.Join(t.TempDir(), "store"))
 	if err != nil {
 		t.Fatalf("store setup %v", err)
@@ -39,7 +40,7 @@ func Test_BuildServer(t *testing.T) {
 	}
 	storeSrv := httptest.NewServer(storeHandler)
 
-	// 3. configure a local builder
+	// 3. configure a builder
 	storeClient, err := strclient.NewStoreClient(strclient.StoreClientConfig{Server: storeSrv.URL})
 	if err != nil {
 		t.Fatalf("store client setup %v", err)
@@ -62,12 +63,13 @@ func Test_BuildServer(t *testing.T) {
 		t.Fatalf("setup %v", err)
 	}
 
-	// 5. start a builder server
+	// 4. start a builder server
 	srvConfig := server.APIServerConfig{
 		BuildService: builder,
 	}
 	buildSrv := httptest.NewServer(server.NewAPIServer(srvConfig))
 
+	// 5. test building k6 with different options
 	testCases := []struct {
 		title       string
 		platform    string
