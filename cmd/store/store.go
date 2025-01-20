@@ -96,7 +96,7 @@ func New() *cobra.Command {
 			}
 
 			srv := http.NewServeMux()
-			srv.Handle("/store/", http.StripPrefix("/store", storeSrv))
+			srv.Handle("/store/", storeSrv)
 
 			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
 			log.Info("starting server", "address", listerAddr, "object store", storeDir)
@@ -114,7 +114,7 @@ func New() *cobra.Command {
 	cmd.Flags().IntVarP(&port, "port", "p", 9000, "port server will listen")
 	cmd.Flags().StringVarP(&storeSrvURL,
 		"download-url", "d", "", "base url used for downloading objects."+
-			"\nIf not specified http://localhost:<port>/store is used",
+			"\nIf not specified http://localhost:<port> is used",
 	)
 	cmd.Flags().StringVarP(&logLevel, "log-level", "l", "INFO", "log level")
 

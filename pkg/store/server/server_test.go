@@ -64,7 +64,7 @@ func TestStoreServerGet(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/%s", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/store/%s", srv.URL, tc.id)
 			resp, err := http.Get(url)
 			if err != nil {
 				t.Fatalf("accessing server %v", err)
@@ -134,7 +134,7 @@ func TestStoreServerPut(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/%s", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/store/%s", srv.URL, tc.id)
 			resp, err := http.Post(
 				url,
 				"application/octet-stream",
@@ -224,7 +224,7 @@ func TestStoreServerDownload(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			url := fmt.Sprintf("%s/%s/download", srv.URL, tc.id)
+			url := fmt.Sprintf("%s/store/%s/download", srv.URL, tc.id)
 			resp, err := http.Get(url)
 			if err != nil {
 				t.Fatalf("accessing server %v", err)

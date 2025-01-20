@@ -282,7 +282,7 @@ k6build server --s3-endpoint http://localhost:4566 --store-bucket k6build
       --s3-endpoint string    s3 endpoint
       --s3-region string      aws region
       --store-bucket string   s3 bucket for storing binaries
-      --store-url string      store server url (default "http://localhost:9000/store")
+      --store-url string      store server url (default "http://localhost:9000")
   -v, --verbose               print build process output
 ```
 
@@ -339,7 +339,7 @@ curl http://external.url:9000/store/objectID/download
 
 ```
   -d, --download-url string   base url used for downloading objects.
-                              If not specified http://localhost:<port>/store is used
+                              If not specified http://localhost:<port> is used
   -h, --help                  help for store
   -l, --log-level string      log level (default "INFO")
   -p, --port int              port server will listen (default 9000)

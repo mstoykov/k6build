@@ -70,9 +70,9 @@ func NewStoreServer(config StoreServerConfig) (http.Handler, error) {
 
 	handler := http.NewServeMux()
 	// FIXME: this should be PUT (used POST as http client doesn't have PUT method)
-	handler.HandleFunc("POST /{id}", storeSrv.Store)
-	handler.HandleFunc("GET /{id}", storeSrv.Get)
-	handler.HandleFunc("GET /{id}/download", storeSrv.Download)
+	handler.HandleFunc("POST /store/{id}", storeSrv.Store)
+	handler.HandleFunc("GET /store/{id}", storeSrv.Get)
+	handler.HandleFunc("GET /store/{id}/download", storeSrv.Download)
 
 	return handler, nil
 }
@@ -159,7 +159,7 @@ func (s *StoreServer) Store(w http.ResponseWriter, r *http.Request) {
 
 func getDownloadURL(baseURL *url.URL, r *http.Request) string {
 	if baseURL != nil {
-		return baseURL.JoinPath(r.PathValue("id"), "download").String()
+		return baseURL.JoinPath("store", r.PathValue("id"), "download").String()
 	}
 
 	return r.URL.JoinPath("download").String()

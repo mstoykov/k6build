@@ -49,7 +49,7 @@ func NewStoreClient(config StoreClientConfig) (*StoreClient, error) {
 
 // Get retrieves an objects if exists in the store or an error otherwise
 func (c *StoreClient) Get(ctx context.Context, id string) (store.Object, error) {
-	reqURL := *c.server.JoinPath(id)
+	reqURL := *c.server.JoinPath("store", id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(api.ErrInvalidRequest, err)
@@ -85,7 +85,7 @@ func (c *StoreClient) Get(ctx context.Context, id string) (store.Object, error) 
 
 // Put stores the object and returns the metadata
 func (c *StoreClient) Put(ctx context.Context, id string, content io.Reader) (store.Object, error) {
-	reqURL := *c.server.JoinPath(id)
+	reqURL := *c.server.JoinPath("store", id)
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
