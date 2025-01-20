@@ -13,6 +13,8 @@ import (
 	"github.com/grafana/k6build/pkg/catalog"
 	"github.com/grafana/k6build/pkg/store/file"
 	"github.com/grafana/k6foundry"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -370,5 +372,133 @@ func TestConcurrentBuilds(t *testing.T) {
 	case err := <-errch:
 		t.Fatalf("unexpected %v", err)
 	default:
+	}
+}
+
+// templates for producing metric text output
+var metricTemplates = map[string]string{
+	"k6build_requests_total": `
+# HELP k6build_requests_total The total number of builds requests
+# TYPE k6build_requests_total counter
+k6build_requests_total %s`,
+	"k6build_builds_total": `
+# HELP k6build_builds_total The total number of builds
+# HELP k6build_builds_total
+# TYPE k6build_builds_total counter
+k6build_builds_total %s`,
+	"k6build_builds_failed_total": `
+# HELP k6build_builds_failed_total The total number of failed builds
+# TYPE k6build_builds_failed_total counter
+k6build_builds_failed_total %s`,
+	"k6build_builds_invalid_total": `
+# HELP k6build_builds_invalid_total The total number of builds with invalid parameters
+# TYPE k6build_builds_invalid_total counter
+k6build_builds_invalid_total %s`,
+}
+
+func TestMetrics(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		title    string
+		requests []string
+		expected map[string]string
+	}{
+		{
+			title:    "single build",
+			requests: []string{"v0.2.0"},
+			expected: map[string]string{
+				"k6build_requests_total":       "1",
+				"k6build_builds_total":         "1",
+				"k6build_builds_invalid_total": "0",
+				"k6build_builds_failed_total":  "0",
+			},
+		},
+		{
+			title:    "unsatisfied build",
+			requests: []string{"v0.3.0"},
+			expected: map[string]string{
+				"k6build_requests_total":       "1",
+				"k6build_builds_total":         "0",
+				"k6build_builds_invalid_total": "1",
+				"k6build_builds_failed_total":  "0",
+			},
+		},
+		{
+			title:    "multiple builds same versions",
+			requests: []string{"v0.2.0", "v0.2.0"},
+			expected: map[string]string{
+				"k6build_requests_total":       "2",
+				"k6build_builds_total":         "1",
+				"k6build_builds_invalid_total": "0",
+				"k6build_builds_failed_total":  "0",
+			},
+		},
+		{
+			title:    "multiple builds different versions",
+			requests: []string{"v0.2.0", "v0.1.0"},
+			expected: map[string]string{
+				"k6build_requests_total":       "2",
+				"k6build_builds_total":         "2",
+				"k6build_builds_invalid_total": "0",
+				"k6build_builds_failed_total":  "0",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			register := prometheus.NewPedanticRegistry()
+
+			catalog, err := catalog.NewCatalogFromJSON(strings.NewReader(catalogJSON))
+			if err != nil {
+				t.Fatalf("setting up test builder %v", err)
+			}
+
+			store, err := file.NewFileStore(t.TempDir())
+			if err != nil {
+				t.Fatalf("creating temporary object store %v", err)
+			}
+
+			builder, err := New(context.Background(), Config{
+				Opts:       Opts{},
+				Catalog:    catalog,
+				Store:      store,
+				Foundry:    FoundryFunction(MockFoundryFactory),
+				Registerer: register,
+			})
+			if err != nil {
+				t.Fatalf("creating builder %v", err)
+			}
+
+			for _, k6 := range tc.requests {
+				_, err = builder.Build(
+					context.TODO(),
+					"linux/amd64",
+					k6,
+					[]k6build.Dependency{},
+				)
+				// ignore unsatisfied builds as they are expected
+				if err != nil && !errors.Is(err, ErrInvalidParameters) {
+					t.Fatalf("unexpected %v", err)
+				}
+			}
+
+			// build the prometheus text output for the expected metrics
+			metrics := []string{}
+			text := strings.Builder{}
+			for metric, expected := range tc.expected {
+				metrics = append(metrics, metric)
+				text.Write([]byte(fmt.Sprintf(metricTemplates[metric], expected)))
+			}
+			text.Write([]byte("\n"))
+
+			err = testutil.CollectAndCompare(register, strings.NewReader(text.String()), metrics...)
+			if err != nil {
+				t.Fatalf("unexpected %v", err)
+			}
+		})
 	}
 }
