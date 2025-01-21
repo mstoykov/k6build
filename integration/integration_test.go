@@ -19,6 +19,7 @@ import (
 	strclient "github.com/grafana/k6build/pkg/store/client"
 	filestore "github.com/grafana/k6build/pkg/store/file"
 	storesrv "github.com/grafana/k6build/pkg/store/server"
+	"github.com/grafana/k6build/pkg/util"
 )
 
 func Test_BuildServer(t *testing.T) {
@@ -94,7 +95,12 @@ func Test_BuildServer(t *testing.T) {
 				t.Fatalf("client setup %v", err)
 			}
 
-			_, err = client.Build(context.TODO(), tc.platform, tc.k6Constrain, tc.deps)
+			artifact, err := client.Build(context.TODO(), tc.platform, tc.k6Constrain, tc.deps)
+			if err != nil {
+				t.Fatalf("building artifact  %v", err)
+			}
+
+			err = util.Download(context.TODO(), artifact.URL, filepath.Join(t.TempDir(), "k6"))
 			if err != nil {
 				t.Fatalf("building artifact  %v", err)
 			}
