@@ -203,7 +203,7 @@ func New() *cobra.Command { //nolint:funlen
 		"dependencies catalog. Can be path to a local file or an URL."+
 			"\n",
 	)
-	cmd.Flags().StringVar(&storeURL, "store-url", "http://localhost:9000/store", "store server url")
+	cmd.Flags().StringVar(&storeURL, "store-url", "http://localhost:9000", "store server url")
 	cmd.Flags().StringVar(&s3Bucket, "store-bucket", "", "s3 bucket for storing binaries")
 	cmd.Flags().StringVar(&s3Endpoint, "s3-endpoint", "", "s3 endpoint")
 	cmd.Flags().StringVar(&s3Region, "s3-region", "", "aws region")
