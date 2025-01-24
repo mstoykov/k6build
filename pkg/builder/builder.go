@@ -123,15 +123,20 @@ func (b *Builder) Build( //nolint:funlen
 	k6Constrains string,
 	deps []k6build.Dependency,
 ) (artifact k6build.Artifact, buildErr error) {
-	// FIXME: this is a temporary solution because the logic has many paths that return
-	// an invalid parameters error and we need to increment the metrics in all of them
+	b.metrics.requestCounter.Inc()
+
+	requestTimer := prometheus.NewTimer(b.metrics.buildTimeHistogram)
 	defer func() {
+		if buildErr == nil {
+			requestTimer.ObserveDuration()
+		}
+
+		// FIXME: this is a temporary solution because the logic has many paths that return
+		// an invalid parameters error and we need to increment the metrics in all of them
 		if errors.Is(buildErr, ErrInvalidParameters) {
 			b.metrics.buildsInvalidCounter.Inc()
 		}
 	}()
-
-	b.metrics.requestCounter.Inc()
 
 	buildPlatform, err := k6foundry.ParsePlatform(platform)
 	if err != nil {
