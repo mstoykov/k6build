@@ -23,17 +23,18 @@ import (
 // DependencyComp compares two dependencies for ordering
 func DependencyComp(a, b catalog.Module) bool { return a.Path < b.Path }
 
-type mockBuilder struct {
-	opts k6foundry.NativeBuilderOpts
+type mockFoundry struct {
+	opts k6foundry.NativeFoundryOpts
 }
 
 // Mocks the Faundry's Build method
 // Returns the build info for the given platform, k6 version and modules
-func (m *mockBuilder) Build(
+func (m *mockFoundry) Build(
 	_ context.Context,
 	platform k6foundry.Platform,
 	k6Version string,
 	mods []k6foundry.Module,
+	reps []k6foundry.Module,
 	buildOpts []string,
 	out io.Writer,
 ) (*k6foundry.BuildInfo, error) {
@@ -47,8 +48,8 @@ func (m *mockBuilder) Build(
 	}, nil
 }
 
-func MockFoundryFactory(_ context.Context, opts k6foundry.NativeBuilderOpts) (k6foundry.Builder, error) {
-	return &mockBuilder{
+func MockFoundryFactory(_ context.Context, opts k6foundry.NativeFoundryOpts) (k6foundry.Foundry, error) {
+	return &mockFoundry{
 		opts: opts,
 	}, nil
 }
@@ -77,7 +78,7 @@ func SetupTestBuilder(t *testing.T) (*Builder, error) {
 		Opts:    Opts{},
 		Catalog: catalog,
 		Store:   store,
-		Foundry: FoundryFunction(MockFoundryFactory),
+		Foundry: FoundryFactoryFunction(MockFoundryFactory),
 	})
 }
 
@@ -466,7 +467,7 @@ func TestMetrics(t *testing.T) {
 				Opts:       Opts{},
 				Catalog:    catalog,
 				Store:      store,
-				Foundry:    FoundryFunction(MockFoundryFactory),
+				Foundry:    FoundryFactoryFunction(MockFoundryFactory),
 				Registerer: register,
 			})
 			if err != nil {

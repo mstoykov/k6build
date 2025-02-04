@@ -42,16 +42,19 @@ var (
 // GoOpts defines the options for the go build environment
 type GoOpts = k6foundry.GoOpts
 
-// Foundry is a function that creates a Foundry Builder
-type Foundry interface {
-	NewBuilder(ctx context.Context, opts k6foundry.NativeBuilderOpts) (k6foundry.Builder, error)
+// FoundryFactory is a function that creates a FoundryFactory
+type FoundryFactory interface {
+	NewFoundry(ctx context.Context, opts k6foundry.NativeFoundryOpts) (k6foundry.Foundry, error)
 }
 
-// FoundryFunction defines a function that implements the Foundry interface
-type FoundryFunction func(context.Context, k6foundry.NativeBuilderOpts) (k6foundry.Builder, error)
+// FoundryFactoryFunction defines a function that implements the FoundryFactory interface
+type FoundryFactoryFunction func(context.Context, k6foundry.NativeFoundryOpts) (k6foundry.Foundry, error)
 
-// NewBuilder implements the Foundry interface
-func (f FoundryFunction) NewBuilder(ctx context.Context, opts k6foundry.NativeBuilderOpts) (k6foundry.Builder, error) {
+// NewFoundry implements the Foundry interface
+func (f FoundryFactoryFunction) NewFoundry(
+	ctx context.Context,
+	opts k6foundry.NativeFoundryOpts,
+) (k6foundry.Foundry, error) {
 	return f(ctx, opts)
 }
 
@@ -70,7 +73,7 @@ type Config struct {
 	Opts       Opts
 	Catalog    catalog.Catalog
 	Store      store.ObjectStore
-	Foundry    Foundry
+	Foundry    FoundryFactory
 	Registerer prometheus.Registerer
 }
 
@@ -80,7 +83,7 @@ type Builder struct {
 	catalog catalog.Catalog
 	store   store.ObjectStore
 	mutexes sync.Map
-	foundry Foundry
+	foundry FoundryFactory
 	metrics *metrics
 }
 
@@ -96,7 +99,7 @@ func New(_ context.Context, config Config) (*Builder, error) {
 
 	foundry := config.Foundry
 	if foundry == nil {
-		foundry = FoundryFunction(k6foundry.NewNativeBuilder)
+		foundry = FoundryFactoryFunction(k6foundry.NewNativeFoundry)
 	}
 
 	metrics := newMetrics()
@@ -215,7 +218,7 @@ func (b *Builder) Build( //nolint:funlen
 		env["CGO_ENABLED"] = "1"
 	}
 
-	builderOpts := k6foundry.NativeBuilderOpts{
+	builderOpts := k6foundry.NativeFoundryOpts{
 		GoOpts: k6foundry.GoOpts{
 			Env:       env,
 			CopyGoEnv: b.opts.CopyGoEnv,
@@ -226,7 +229,7 @@ func (b *Builder) Build( //nolint:funlen
 		builderOpts.Stderr = os.Stderr
 	}
 
-	builder, err := b.foundry.NewBuilder(ctx, builderOpts)
+	builder, err := b.foundry.NewFoundry(ctx, builderOpts)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrInitializingBuilder, err)
 	}
@@ -234,7 +237,7 @@ func (b *Builder) Build( //nolint:funlen
 	buildTimer := prometheus.NewTimer(b.metrics.buildTimeHistogram)
 
 	artifactBuffer := &bytes.Buffer{}
-	buildInfo, err := builder.Build(ctx, buildPlatform, k6Mod.Version, mods, []string{}, artifactBuffer)
+	buildInfo, err := builder.Build(ctx, buildPlatform, k6Mod.Version, mods, nil, []string{}, artifactBuffer)
 	if err != nil {
 		b.metrics.buildsFailedCounter.Inc()
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
