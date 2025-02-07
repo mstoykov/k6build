@@ -209,6 +209,9 @@ k6 build service
 
 Starts a k6build server
 
+API
+---
+
 The server exposes an API for building custom k6 binaries.
 
 The API returns the metadata of the custom binary, including an URL for downloading it,
@@ -243,6 +246,17 @@ For example
 
 Note: The build server disables CGO by default but enables it when a dependency requires it.
       use --enable-cgo=true to enable CGO support by default.
+
+
+Metrics
+--------
+
+The server exposes prometheus metrics at /metrics
+
+Liveness Probe
+--------------
+
+The server exposes a liveness check at /alive
 
 
 ```

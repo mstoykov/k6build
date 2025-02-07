@@ -25,6 +25,9 @@ const (
 	long = `
 Starts a k6build server
 
+API
+---
+
 The server exposes an API for building custom k6 binaries.
 
 The API returns the metadata of the custom binary, including an URL for downloading it,
@@ -59,6 +62,17 @@ For example
 
 Note: The build server disables CGO by default but enables it when a dependency requires it.
       use --enable-cgo=true to enable CGO support by default.
+
+
+Metrics
+--------
+
+The server exposes prometheus metrics at /metrics
+
+Liveness Probe
+--------------
+
+The server exposes a liveness check at /alive
 `
 
 	example = `
@@ -75,6 +89,11 @@ export AWS_SECRET_ACCESS_KEY="test"
 k6build server --s3-endpoint http://localhost:4566 --store-bucket k6build
 `
 )
+
+// livenessHandler is a simple handler that returns a 200 status code.
+func livenessHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
 
 // New creates new cobra command for the server command.
 func New() *cobra.Command { //nolint:funlen
@@ -182,6 +201,9 @@ func New() *cobra.Command { //nolint:funlen
 
 			// serve metrics
 			srv.Handle("/metrics", promhttp.Handler())
+
+			// add liveness check
+			srv.HandleFunc("/alive", livenessHandler)
 
 			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
 			log.Info("starting server", "address", listerAddr)
