@@ -1,5 +1,6 @@
 ARG GO_VERSION=1.22.4
 ARG VARIANT=bookworm
+ARG VERSION=devel
 FROM golang:${GO_VERSION}-${VARIANT} as builder
 
 WORKDIR /build
@@ -7,7 +8,9 @@ WORKDIR /build
 COPY . .
 
 ARG GOFLAGS="-ldflags=-w -ldflags=-s"
-RUN CGO_ENABLED=0 go build -o k6build -trimpath ./cmd/k6build/main.go
+RUN CGO_ENABLED=0 go build -o k6build -trimpath \
+    -ldflags="-X github.com/grafana/k6build/pkg/version.BuildVersion=${VERSION}" \
+    ./cmd/k6build/main.go
 
 # k6build server requires golang toolchain
 FROM golang:${GO_VERSION}-${VARIANT}

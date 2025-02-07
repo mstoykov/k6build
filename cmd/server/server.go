@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/store/client"
 	"github.com/grafana/k6build/pkg/store/s3"
+	"github.com/grafana/k6build/pkg/version"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -206,7 +207,7 @@ func New() *cobra.Command { //nolint:funlen
 			srv.HandleFunc("/alive", livenessHandler)
 
 			listerAddr := fmt.Sprintf("0.0.0.0:%d", port)
-			log.Info("starting server", "address", listerAddr)
+			log.Info("starting server", "address", listerAddr, "version", version.Details())
 			err = http.ListenAndServe(listerAddr, srv) //nolint:gosec
 			if err != nil {
 				log.Info("server ended", "error", err.Error())
