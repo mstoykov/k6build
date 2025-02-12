@@ -164,7 +164,8 @@ func (b *Builder) Build( //nolint:funlen
 		if !b.opts.AllowBuildSemvers {
 			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, ErrBuildSemverNotAllowed)
 		}
-		k6Mod = catalog.Module{Path: k6Path, Version: buildMetadata}
+		// use a semantic version for the build metadata
+		k6Mod = catalog.Module{Path: k6Path, Version: "v0.0.0+" + buildMetadata}
 	} else {
 		k6Mod, err = b.catalog.Resolve(ctx, catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
 		if err != nil {
@@ -242,19 +243,23 @@ func (b *Builder) Build( //nolint:funlen
 	buildTimer := prometheus.NewTimer(b.metrics.buildTimeHistogram)
 
 	artifactBuffer := &bytes.Buffer{}
-	buildInfo, err := builder.Build(ctx, buildPlatform, k6Mod.Version, mods, nil, []string{}, artifactBuffer)
+
+	// if we are building a build metadata version, we must pass only the build hash to the builder
+	k6Version := k6Mod.Version
+	if buildMetadata != "" {
+		k6Version = buildMetadata
+	}
+
+	// We are ignoring here the k6 version returned by the build process because we should
+	// return always v0.0.0+<build metadata> as the version of the k6 module if it has build metadata
+	// but the builder will return the actual version (e.g. v0.54.1-0.20241022073258-09a768494cd0)
+	_, err = builder.Build(ctx, buildPlatform, k6Version, mods, nil, []string{}, artifactBuffer)
 	if err != nil {
 		b.metrics.buildsFailedCounter.Inc()
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
 	buildTimer.ObserveDuration()
-
-	// if the version has a build metadata, we must use the actual version built
-	// TODO: check this version is supported
-	if buildMetadata != "" {
-		resolved[k6Dep] = buildInfo.ModVersions[k6Mod.Path]
-	}
 
 	artifactObject, err = b.store.Put(ctx, id, artifactBuffer)
 	if err != nil {
