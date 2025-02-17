@@ -30,11 +30,11 @@ const (
 )
 
 var (
-	ErrAccessingArtifact     = errors.New("accessing artifact")                      //nolint:revive
-	ErrBuildingArtifact      = errors.New("building artifact")                       //nolint:revive
-	ErrInitializingBuilder   = errors.New("initializing builder")                    //nolint:revive
-	ErrInvalidParameters     = errors.New("invalid build parameters")                //nolint:revive
-	ErrBuildSemverNotAllowed = errors.New("semvers with build metadata not allowed") //nolint:revive
+	ErrAccessingArtifact     = errors.New("accessing artifact") //nolint:revive
+	ErrBuildingArtifact      = errors.New("building artifact")
+	ErrInitializingBuilder   = errors.New("initializing builder")
+	ErrInvalidParameters     = errors.New("invalid build parameters")
+	ErrBuildSemverNotAllowed = errors.New("semvers with build metadata not allowed")
 
 	constrainRe = regexp.MustCompile(opRe + verRe + buildRe)
 )

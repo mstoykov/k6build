@@ -53,12 +53,11 @@ const (
 
 var (
 	ErrCannotSatisfy     = errors.New("cannot satisfy dependency") //nolint:revive
-	ErrDownload          = errors.New("downloading catalog")       //nolint:revive
-	ErrInvalidConstrain  = errors.New("invalid constrain")         //nolint:revive
-	ErrInvalidCatalog    = fmt.Errorf("invalid catalog")           //nolint:revive
-	ErrOpening           = errors.New("opening catalog")           //nolint:revive
-	ErrUnknownDependency = errors.New("unknown dependency")        //nolint:revive
-
+	ErrDownload          = errors.New("downloading catalog")
+	ErrInvalidConstrain  = errors.New("invalid constrain")
+	ErrInvalidCatalog    = fmt.Errorf("invalid catalog")
+	ErrOpening           = errors.New("opening catalog")
+	ErrUnknownDependency = errors.New("unknown dependency")
 )
 
 // Dependency defines a Dependency with a version constrain
