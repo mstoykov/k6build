@@ -128,7 +128,7 @@ func (b *Builder) Build( //nolint:funlen
 ) (artifact k6build.Artifact, buildErr error) {
 	b.metrics.requestCounter.Inc()
 
-	requestTimer := prometheus.NewTimer(b.metrics.buildTimeHistogram)
+	requestTimer := prometheus.NewTimer(b.metrics.requestTimeHistogram)
 	defer func() {
 		if buildErr == nil {
 			requestTimer.ObserveDuration()
