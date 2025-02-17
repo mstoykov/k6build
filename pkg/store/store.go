@@ -10,13 +10,12 @@ import (
 )
 
 var (
-	ErrAccessingObject   = errors.New("accessing object")   //nolint:revive
-	ErrCreatingObject    = errors.New("creating object")    //nolint:revive
-	ErrInitializingStore = errors.New("initializing store") //nolint:revive
-	ErrInvalidURL        = errors.New("invalid object URL") //nolint:revive
-	ErrObjectNotFound    = errors.New("object not found")   //nolint:revive
-	ErrNotSupported      = errors.New("not supported")      //nolint:revive
-
+	ErrAccessingObject   = errors.New("accessing object") //nolint:revive
+	ErrCreatingObject    = errors.New("creating object")
+	ErrInitializingStore = errors.New("initializing store")
+	ErrInvalidURL        = errors.New("invalid object URL")
+	ErrObjectNotFound    = errors.New("object not found")
+	ErrNotSupported      = errors.New("not supported")
 )
 
 // Object represents an object stored in the store

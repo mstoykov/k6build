@@ -23,7 +23,7 @@ func newMetrics() *metrics {
 		Help:      "The total number of builds requests",
 	})
 
-	buildTimeHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+	requestDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: metricsNamespace,
 		Name:      "request_duration_seconds",
 		Help:      "The duration of the build request in seconds",
@@ -54,7 +54,7 @@ func newMetrics() *metrics {
 		Help:      "The total number of object store hits",
 	})
 
-	requestDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+	buildTimeHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: metricsNamespace,
 		Name:      "build_duration_seconds",
 		Help:      "The duration of the build in seconds",
