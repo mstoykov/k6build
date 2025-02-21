@@ -114,6 +114,7 @@ func Test_ConcurrentBuilds(t *testing.T) {
 			artifact, err := client.Build(context.TODO(), platform, k6Constrain, deps)
 			if err != nil {
 				errCh <- fmt.Errorf("building artifact  %v", err)
+				return
 			}
 
 			k6BinPath := filepath.Join(t.TempDir(), "k6")
@@ -123,7 +124,7 @@ func Test_ConcurrentBuilds(t *testing.T) {
 				return
 			}
 
-			err = exec.CommandContext(context.TODO(), k6BinPath, "version").Run()
+			err = exec.Command(k6BinPath, "version").Run()
 			if err != nil {
 				errCh <- fmt.Errorf("running k6 %v", err)
 				return
