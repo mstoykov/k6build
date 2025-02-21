@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"syscall"
 )
 
 var (
@@ -31,7 +32,11 @@ func Download(ctx context.Context, url string, output string) error {
 		_ = resp.Body.Close()
 	}()
 
-	outFile, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE, 0o755) //nolint:gosec
+	outFile, err := os.OpenFile( //nolint:gosec
+		output,
+		os.O_TRUNC|os.O_WRONLY|os.O_CREATE,
+		syscall.S_IRUSR|syscall.S_IXUSR|syscall.S_IWUSR,
+	)
 	if err != nil {
 		return fmt.Errorf("%w %w", ErrWritingFile, err)
 	}

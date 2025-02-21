@@ -71,12 +71,9 @@ func Test_BuildServer(t *testing.T) {
 				t.Fatalf("k6 binary is empty")
 			}
 
-			// FIXME: Windows does not allow running the binary from a temp directory
-			if runtime.GOOS != "windows" {
-				err = exec.Command(k6BinPath, "version").Run()
-				if err != nil {
-					t.Fatalf("running k6 %v", err)
-				}
+			err = exec.Command(k6BinPath, "version").Run()
+			if err != nil {
+				t.Fatalf("running k6 %v", err)
 			}
 		})
 	}
@@ -142,13 +139,10 @@ func Test_ConcurrentBuilds(t *testing.T) {
 				return
 			}
 
-			// FIXME: Windows does not allow running the binary from a temp directory
-			if runtime.GOOS != "windows" {
-				err = exec.Command(k6BinPath, "version").Run()
-				if err != nil {
-					errCh <- fmt.Errorf("running k6 %v", err)
-					return
-				}
+			err = exec.Command(k6BinPath, "version").Run()
+			if err != nil {
+				errCh <- fmt.Errorf("running k6 %v", err)
+				return
 			}
 		}()
 	}
