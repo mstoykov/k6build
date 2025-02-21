@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/store"
@@ -128,6 +129,11 @@ func (s *Store) Put(ctx context.Context, id string, content io.Reader) (store.Ob
 		},
 	)
 	if err != nil {
+		// check for duplicated object
+		var aerr smithy.APIError
+		if errors.As(err, &aerr) && aerr.ErrorCode() == "PreconditionFailed" {
+			return store.Object{}, fmt.Errorf("%w: %q", store.ErrDuplicateObject, id)
+		}
 		return store.Object{}, k6build.NewWrappedError(store.ErrCreatingObject, err)
 	}
 
@@ -157,8 +163,9 @@ func (s *Store) Get(ctx context.Context, id string) (store.Object, error) {
 		},
 	)
 	if err != nil {
-		var bne *types.NoSuchKey
-		if errors.As(err, &bne) {
+		// check for object not found
+		var aerr smithy.APIError
+		if errors.As(err, &aerr) && aerr.ErrorCode() == "NoSuchKey" {
 			return store.Object{}, fmt.Errorf("%w (%s)", store.ErrObjectNotFound, id)
 		}
 

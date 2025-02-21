@@ -16,6 +16,7 @@ var (
 	ErrInvalidURL        = errors.New("invalid object URL")
 	ErrObjectNotFound    = errors.New("object not found")
 	ErrNotSupported      = errors.New("not supported")
+	ErrDuplicateObject   = errors.New("duplicate object")
 )
 
 // Object represents an object stored in the store

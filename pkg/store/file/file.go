@@ -59,7 +59,7 @@ func (f *Store) Put(_ context.Context, id string, content io.Reader) (store.Obje
 	objectDir := filepath.Join(f.dir, id)
 
 	if _, err := os.Stat(objectDir); !errors.Is(err, os.ErrNotExist) {
-		return store.Object{}, fmt.Errorf("%w: object already exists %q", store.ErrCreatingObject, id)
+		return store.Object{}, fmt.Errorf("%w: %q", store.ErrDuplicateObject, id)
 	}
 
 	// TODO: check permissions
