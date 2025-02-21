@@ -123,7 +123,7 @@ func New(_ context.Context, config Config) (*Builder, error) {
 }
 
 // Build builds a custom k6 binary with dependencies
-func (b *Builder) Build(
+func (b *Builder) Build( //nolint:funlen
 	ctx context.Context,
 	platform string,
 	k6Constrains string,
@@ -188,6 +188,12 @@ func (b *Builder) Build(
 	buildTimer.ObserveDuration()
 
 	artifactObject, err = b.store.Put(ctx, id, artifactBuffer)
+
+	// if there was a conflict creating the object, get returns the object
+	if errors.Is(err, store.ErrDuplicateObject) || (err != nil && strings.Contains(err.Error(), "duplicate object")) {
+		artifactObject, err = b.store.Get(ctx, id)
+	}
+
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
