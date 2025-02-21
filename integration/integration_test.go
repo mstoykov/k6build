@@ -19,6 +19,13 @@ import (
 	"github.com/grafana/k6build/pkg/util"
 )
 
+func k6BinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "k6.exe"
+	}
+	return "k6"
+}
+
 func Test_BuildServer(t *testing.T) {
 	t.Parallel()
 
@@ -57,7 +64,7 @@ func Test_BuildServer(t *testing.T) {
 				t.Fatalf("building artifact  %v", err)
 			}
 
-			k6BinPath := filepath.Join(t.TempDir(), "k6")
+			k6BinPath := filepath.Join(t.TempDir(), k6BinaryName())
 			err = util.Download(context.TODO(), artifact.URL, k6BinPath)
 			if err != nil {
 				t.Fatalf("downloading artifact  %v", err)
@@ -132,7 +139,7 @@ func Test_ConcurrentBuilds(t *testing.T) {
 				return
 			}
 
-			k6BinPath := filepath.Join(t.TempDir(), "k6")
+			k6BinPath := filepath.Join(t.TempDir(), k6BinaryName())
 			err = util.Download(context.TODO(), artifact.URL, k6BinPath)
 			if err != nil {
 				errCh <- fmt.Errorf("downloading artifact  %v", err)
