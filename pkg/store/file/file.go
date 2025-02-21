@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/store"
@@ -20,8 +19,7 @@ import (
 
 // Store a ObjectStore backed by a file system
 type Store struct {
-	dir     string
-	mutexes sync.Map
+	dir string
 }
 
 // NewTempFileStore creates a file object store using a temporary file
@@ -52,14 +50,10 @@ func (f *Store) Put(_ context.Context, id string, content io.Reader) (store.Obje
 		return store.Object{}, fmt.Errorf("%w id cannot contain '/'", store.ErrCreatingObject)
 	}
 
-	// prevent concurrent modification of an object
-	unlock := f.lockObject(id)
-	defer unlock()
-
 	objectDir := filepath.Join(f.dir, id)
 
 	if _, err := os.Stat(objectDir); !errors.Is(err, os.ErrNotExist) {
-		return store.Object{}, fmt.Errorf("%w: object already exists %q", store.ErrCreatingObject, id)
+		return store.Object{}, fmt.Errorf("%w: %q", store.ErrDuplicateObject, id)
 	}
 
 	// TODO: check permissions
@@ -67,6 +61,13 @@ func (f *Store) Put(_ context.Context, id string, content io.Reader) (store.Obje
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(store.ErrCreatingObject, err)
 	}
+
+	// prevent concurrent modification of an object
+	unlock, err := f.lockObject(id)
+	if err != nil {
+		return store.Object{}, k6build.NewWrappedError(store.ErrCreatingObject, err)
+	}
+	defer unlock()
 
 	objectFile, err := os.Create(filepath.Join(objectDir, "data")) //nolint:gosec
 	if err != nil {
@@ -112,6 +113,13 @@ func (f *Store) Get(_ context.Context, id string) (store.Object, error) {
 		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
 	}
 
+	// prevent accessing object while is being written
+	unlock, err := f.lockObject(id)
+	if err != nil {
+		return store.Object{}, k6build.NewWrappedError(store.ErrCreatingObject, err)
+	}
+	defer unlock()
+
 	checksum, err := os.ReadFile(filepath.Join(objectDir, "checksum")) //nolint:gosec
 	if err != nil {
 		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
@@ -128,18 +136,14 @@ func (f *Store) Get(_ context.Context, id string) (store.Object, error) {
 	}, nil
 }
 
-// lockObject obtains a mutex used to prevent concurrent builds of the same artifact and
-// returns a function that will unlock the mutex associated to the given id in the object store.
-// The lock is also removed from the map. Subsequent calls will get another lock on the same
-// id but this is safe as the object should already be in the object store and no further
-// builds are needed.
-func (f *Store) lockObject(id string) func() {
-	value, _ := f.mutexes.LoadOrStore(id, &sync.Mutex{})
-	mtx, _ := value.(*sync.Mutex)
-	mtx.Lock()
+// lockObject creates a lock for an object's directory using a file lock
+func (f *Store) lockObject(id string) (func(), error) {
+	objLock := newDirLock(filepath.Join(f.dir, id))
+	if err := objLock.lock(0); err != nil {
+		return nil, err
+	}
 
 	return func() {
-		f.mutexes.Delete(id)
-		mtx.Unlock()
-	}
+		_ = objLock.unlock()
+	}, nil
 }

@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
-	github.com/aws/aws-sdk-go-v2 v1.36.1
+	github.com/aws/aws-sdk-go-v2 v1.36.2
 	github.com/aws/aws-sdk-go-v2/config v1.29.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.59
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.77.0
@@ -88,6 +88,7 @@ require (
 )
 
 require (
+	github.com/aws/aws-sdk-go v1.55.6
 	github.com/google/go-cmp v0.6.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/prometheus/client_golang v1.20.5

@@ -59,7 +59,7 @@ func TestFileStoreStoreObject(t *testing.T) {
 			},
 			id:        "object",
 			content:   []byte("new content"),
-			expectErr: store.ErrCreatingObject,
+			expectErr: store.ErrDuplicateObject,
 		},
 		{
 			title:   "store empty object",

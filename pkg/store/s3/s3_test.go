@@ -138,7 +138,7 @@ func TestPutObject(t *testing.T) {
 			title:     "put existing object",
 			id:        "existing-object",
 			content:   []byte("new content"),
-			expectErr: store.ErrCreatingObject,
+			expectErr: store.ErrDuplicateObject,
 		},
 		{
 			title:   "put empty object",
