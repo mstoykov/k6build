@@ -7,9 +7,12 @@ import (
 	"crypto/sha1" //nolint:gosec
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"os"
 	"regexp"
-	"sort"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/grafana/k6build"
@@ -21,8 +24,8 @@ import (
 )
 
 const (
-	k6Dep  = "k6"
-	k6Path = "go.k6.io/k6"
+	k6DependencyName = "k6"
+	k6Path           = "go.k6.io/k6"
 
 	opRe    = `(?<operator>[=|~|>|<|\^|>=|<=|!=]){0,1}(?:\s*)`
 	verRe   = `(?P<version>[v|V](?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`
@@ -120,7 +123,7 @@ func New(_ context.Context, config Config) (*Builder, error) {
 }
 
 // Build builds a custom k6 binary with dependencies
-func (b *Builder) Build( //nolint:funlen
+func (b *Builder) Build(
 	ctx context.Context,
 	platform string,
 	k6Constrains string,
@@ -141,59 +144,18 @@ func (b *Builder) Build( //nolint:funlen
 		}
 	}()
 
-	buildPlatform, err := k6foundry.ParsePlatform(platform)
+	// check if the platform is valid early to avoid unnecessary work
+	_, err := k6foundry.ParsePlatform(platform)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 	}
 
-	// sort dependencies to ensure idempotence of build
-	sort.Slice(deps, func(i, j int) bool { return deps[i].Name < deps[j].Name })
-	resolved := map[string]string{}
-
-	// check if it is a semver of the form v0.0.0+<build>
-	// if it is, we don't check with the catalog, but instead we use
-	// the build metadata as version when building this module
-	// the build process will return the actual version built in the build info
-	// and we can check that version with the catalog
-	var k6Mod catalog.Module
-	buildMetadata, err := hasBuildMetadata(k6Constrains)
+	k6Mod, resolved, err := b.resolveDependencies(ctx, k6Constrains, deps)
 	if err != nil {
-		return k6build.Artifact{}, err
-	}
-	if buildMetadata != "" {
-		if !b.opts.AllowBuildSemvers {
-			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, ErrBuildSemverNotAllowed)
-		}
-		// use a semantic version for the build metadata
-		k6Mod = catalog.Module{Path: k6Path, Version: "v0.0.0+" + buildMetadata}
-	} else {
-		k6Mod, err = b.catalog.Resolve(ctx, catalog.Dependency{Name: k6Dep, Constrains: k6Constrains})
-		if err != nil {
-			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
-		}
-	}
-	resolved[k6Dep] = k6Mod.Version
-
-	mods := []k6foundry.Module{}
-	cgoEnabled := false
-	for _, d := range deps {
-		m, modErr := b.catalog.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
-		if modErr != nil {
-			return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, modErr)
-		}
-		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
-		resolved[d.Name] = m.Version
-		cgoEnabled = cgoEnabled || m.Cgo
+		return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 	}
 
-	// generate id form sorted list of dependencies
-	hashData := bytes.Buffer{}
-	hashData.WriteString(platform)
-	hashData.WriteString(fmt.Sprintf(":k6%s", k6Mod.Version))
-	for _, d := range deps {
-		hashData.WriteString(fmt.Sprintf(":%s%s", d, resolved[d.Name]))
-	}
-	id := fmt.Sprintf("%x", sha1.Sum(hashData.Bytes())) //nolint:gosec
+	id := generateArtifactID(platform, k6Mod, resolved)
 
 	unlock := b.lockArtifact(id)
 	defer unlock()
@@ -206,7 +168,7 @@ func (b *Builder) Build( //nolint:funlen
 			ID:           id,
 			Checksum:     artifactObject.Checksum,
 			URL:          artifactObject.URL,
-			Dependencies: resolved,
+			Dependencies: resolvedVersions(k6Mod, resolved),
 			Platform:     platform,
 		}, nil
 	}
@@ -215,50 +177,14 @@ func (b *Builder) Build( //nolint:funlen
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
 	}
 
-	// set CGO_ENABLED if any of the dependencies require it
-	env := b.opts.Env
-	if cgoEnabled {
-		if env == nil {
-			env = map[string]string{}
-		}
-		env["CGO_ENABLED"] = "1"
-	}
-
-	builderOpts := k6foundry.NativeFoundryOpts{
-		GoOpts: k6foundry.GoOpts{
-			Env:       env,
-			CopyGoEnv: b.opts.CopyGoEnv,
-		},
-	}
-	if b.opts.Verbose {
-		builderOpts.Stdout = os.Stdout
-		builderOpts.Stderr = os.Stderr
-	}
-
-	builder, err := b.foundry.NewFoundry(ctx, builderOpts)
-	if err != nil {
-		return k6build.Artifact{}, k6build.NewWrappedError(ErrInitializingBuilder, err)
-	}
 	b.metrics.buildCounter.Inc()
 	buildTimer := prometheus.NewTimer(b.metrics.buildTimeHistogram)
 
 	artifactBuffer := &bytes.Buffer{}
-
-	// if we are building a build metadata version, we must pass only the build hash to the builder
-	k6Version := k6Mod.Version
-	if buildMetadata != "" {
-		k6Version = buildMetadata
-	}
-
-	// We are ignoring here the k6 version returned by the build process because we should
-	// return always v0.0.0+<build metadata> as the version of the k6 module if it has build metadata
-	// but the builder will return the actual version (e.g. v0.54.1-0.20241022073258-09a768494cd0)
-	_, err = builder.Build(ctx, buildPlatform, k6Version, mods, nil, []string{}, artifactBuffer)
+	err = b.buildArtifact(ctx, platform, k6Mod.Version, resolved, artifactBuffer)
 	if err != nil {
-		b.metrics.buildsFailedCounter.Inc()
-		return k6build.Artifact{}, k6build.NewWrappedError(ErrAccessingArtifact, err)
+		return k6build.Artifact{}, k6build.NewWrappedError(ErrBuildingArtifact, err)
 	}
-
 	buildTimer.ObserveDuration()
 
 	artifactObject, err = b.store.Put(ctx, id, artifactBuffer)
@@ -270,9 +196,48 @@ func (b *Builder) Build( //nolint:funlen
 		ID:           id,
 		Checksum:     artifactObject.Checksum,
 		URL:          artifactObject.URL,
-		Dependencies: resolved,
+		Dependencies: resolvedVersions(k6Mod, resolved),
 		Platform:     platform,
 	}, nil
+}
+
+func (b *Builder) resolveDependencies(
+	ctx context.Context,
+	k6Constrains string,
+	deps []k6build.Dependency,
+) (catalog.Module, map[string]catalog.Module, error) {
+	resolved := map[string]catalog.Module{}
+
+	// check if it is a semver of the form v0.0.0+<build>
+	// if it is, we don't check with the catalog, but instead we use
+	// the build metadata as version when building this module
+	var k6Mod catalog.Module
+	buildMetadata, err := hasBuildMetadata(k6Constrains)
+	if err != nil {
+		return catalog.Module{}, nil, err
+	}
+	if buildMetadata != "" {
+		if !b.opts.AllowBuildSemvers {
+			return catalog.Module{}, nil, ErrBuildSemverNotAllowed
+		}
+		// use a semantic version for the build metadata
+		k6Mod = catalog.Module{Path: k6Path, Version: "v0.0.0+" + buildMetadata}
+	} else {
+		k6Mod, err = b.catalog.Resolve(ctx, catalog.Dependency{Name: k6DependencyName, Constrains: k6Constrains})
+		if err != nil {
+			return catalog.Module{}, nil, err
+		}
+	}
+
+	for _, d := range deps {
+		m, err := b.catalog.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
+		if err != nil {
+			return catalog.Module{}, nil, err
+		}
+		resolved[d.Name] = m
+	}
+
+	return k6Mod, resolved, nil
 }
 
 // lockArtifact obtains a mutex used to prevent concurrent builds of the same artifact and
@@ -292,7 +257,8 @@ func (b *Builder) lockArtifact(id string) func() {
 }
 
 // hasBuildMetadata checks if the constrain references a version with a build metadata.
-// E.g.  v0.1.0+build-effa45f
+// and if so, checks if the version is valid. Only v0.0.0 is allowed.
+// E.g.  v0.0.0+effa45f
 func hasBuildMetadata(constrain string) (string, error) {
 	opInx := constrainRe.SubexpIndex("operator")
 	verIdx := constrainRe.SubexpIndex("version")
@@ -321,4 +287,86 @@ func hasBuildMetadata(constrain string) (string, error) {
 		)
 	}
 	return build, nil
+}
+
+// generateArtifactID generates a unique identifier for a build
+func generateArtifactID(platform string, k6Mod catalog.Module, deps map[string]catalog.Module) string {
+	hashData := bytes.Buffer{}
+	hashData.WriteString(platform)
+	hashData.WriteString(fmt.Sprintf(":%s%s", k6DependencyName, k6Mod.Version))
+	for _, d := range slices.Sorted(maps.Keys(deps)) {
+		hashData.WriteString(fmt.Sprintf(":%s%s", d, deps[d].Version))
+	}
+
+	return fmt.Sprintf("%x", sha1.Sum(hashData.Bytes())) //nolint:gosec
+}
+
+func resolvedVersions(k6Dep catalog.Module, deps map[string]catalog.Module) map[string]string {
+	versions := map[string]string{}
+
+	versions[k6DependencyName] = k6Dep.Version
+	for d, m := range deps {
+		versions[d] = m.Version
+	}
+
+	return versions
+}
+
+func (b *Builder) buildArtifact(
+	ctx context.Context,
+	platform string,
+	k6Version string,
+	deps map[string]catalog.Module,
+	artifactBuffer io.Writer,
+) error {
+	// already checked the platform is valid, should be safe to ignore the error
+	buildPlatform, _ := k6foundry.ParsePlatform(platform)
+
+	mods := []k6foundry.Module{}
+	cgoEnabled := false
+	for _, m := range deps {
+		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
+		cgoEnabled = cgoEnabled || m.Cgo
+	}
+
+	// set CGO_ENABLED if any of the dependencies require it
+	env := b.opts.Env
+	if cgoEnabled {
+		if env == nil {
+			env = map[string]string{}
+		}
+		env["CGO_ENABLED"] = "1"
+	}
+
+	builderOpts := k6foundry.NativeFoundryOpts{
+		GoOpts: k6foundry.GoOpts{
+			Env:       env,
+			CopyGoEnv: b.opts.CopyGoEnv,
+		},
+	}
+	if b.opts.Verbose {
+		builderOpts.Stdout = os.Stdout
+		builderOpts.Stderr = os.Stderr
+	}
+
+	builder, err := b.foundry.NewFoundry(ctx, builderOpts)
+	if err != nil {
+		return k6build.NewWrappedError(ErrInitializingBuilder, err)
+	}
+
+	// if the version is a build version, we need the build metadata and ignore the version
+	// as go does not accept semvers with build metadata
+	_, build, found := strings.Cut(k6Version, "+")
+	if found {
+		k6Version = build
+	}
+
+	_, err = builder.Build(ctx, buildPlatform, k6Version, mods, nil, []string{}, artifactBuffer)
+	if err != nil {
+		b.metrics.buildsFailedCounter.Inc()
+		return k6build.NewWrappedError(ErrAccessingArtifact, err)
+	}
+
+	// TODO: complete artifact info
+	return nil
 }
