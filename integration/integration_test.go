@@ -56,9 +56,15 @@ func Test_BuildServer(t *testing.T) {
 				t.Fatalf("building artifact  %v", err)
 			}
 
-			err = util.Download(context.TODO(), artifact.URL, filepath.Join(t.TempDir(), "k6"))
+			k6BinPath := filepath.Join(t.TempDir(), "k6")
+			err = util.Download(context.TODO(), artifact.URL, k6BinPath)
 			if err != nil {
 				t.Fatalf("downloading artifact  %v", err)
+			}
+
+			err = exec.Command(k6BinPath, "version").Run()
+			if err != nil {
+				t.Fatalf("running k6 %v", err)
 			}
 		})
 	}
