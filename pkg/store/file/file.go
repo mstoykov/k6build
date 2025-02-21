@@ -112,9 +112,23 @@ func (f *Store) Get(_ context.Context, id string) (store.Object, error) {
 		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
 	}
 
-	checksum, err := os.ReadFile(filepath.Join(objectDir, "checksum")) //nolint:gosec
-	if err != nil {
-		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
+	var checksum []byte
+	// FIXME: this is a poor person's lock to prevent reading the object while it is being written
+	// the "lock" is released when the checksum is fully written
+	// if the other process ends before the checksum is fully written, this "lock" will never be released
+	for {
+		checksum, err = os.ReadFile(filepath.Join(objectDir, "checksum")) //nolint:gosec
+		if err == nil {
+			if len(checksum) == sha256.Size*2 {
+				break
+			}
+			// checksum is not fully written, try again
+			continue
+		}
+		// if the checksum file is not found, try again, otherwise return the error
+		if !errors.Is(err, os.ErrNotExist) {
+			return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
+		}
 	}
 
 	objectURL, err := util.URLFromFilePath(filepath.Join(objectDir, "data"))
