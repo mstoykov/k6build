@@ -97,9 +97,6 @@ func (s *StoreServer) Get(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, store.ErrObjectNotFound) {
 			s.log.Debug(err.Error())
 			w.WriteHeader(http.StatusNotFound)
-		} else {
-			s.log.Error(err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
 		}
 		resp.Error = k6build.NewWrappedError(api.ErrObjectStoreAccess, err)
 		_ = json.NewEncoder(w).Encode(resp) //nolint:errchkjson
@@ -141,7 +138,7 @@ func (s *StoreServer) Store(w http.ResponseWriter, r *http.Request) {
 
 	object, err := s.store.Put(context.Background(), id, r.Body) //nolint:contextcheck
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusOK)
 		resp.Error = k6build.NewWrappedError(api.ErrObjectStoreAccess, err)
 		return
 	}
