@@ -6,8 +6,10 @@ package k6provider
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/grafana/k6build"
@@ -25,7 +27,6 @@ func Test_BuildServer(t *testing.T) {
 	}
 	t.Cleanup(testEnv.Cleanup)
 
-	// 5. test building k6 with different options
 	testCases := []struct {
 		title       string
 		platform    string
@@ -57,8 +58,84 @@ func Test_BuildServer(t *testing.T) {
 
 			err = util.Download(context.TODO(), artifact.URL, filepath.Join(t.TempDir(), "k6"))
 			if err != nil {
-				t.Fatalf("building artifact  %v", err)
+				t.Fatalf("downloading artifact  %v", err)
 			}
 		})
+	}
+}
+
+func Test_ConcurrentBuilds(t *testing.T) {
+	t.Parallel()
+
+	// Create a temporary directory to store the k6 binary.
+	// This directory is shared by the store servers so ww can test conflicts accessing objects
+	workDir := t.TempDir()
+
+	testEnv1, err := testutils.NewTestEnv(testutils.TestEnvConfig{WorkDir: workDir})
+	if err != nil {
+		t.Fatalf("test env setup %v", err)
+	}
+	t.Cleanup(testEnv1.Cleanup)
+
+	testEnv2, err := testutils.NewTestEnv(testutils.TestEnvConfig{WorkDir: workDir})
+	if err != nil {
+		t.Fatalf("test env setup %v", err)
+	}
+	t.Cleanup(testEnv2.Cleanup)
+
+	platform := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	k6Constrain := "*"
+	deps := []k6build.Dependency{}
+
+	wg := sync.WaitGroup{}
+	servers := []string{
+		testEnv1.BuildServiceURL(),
+		testEnv2.BuildServiceURL(),
+		testEnv1.BuildServiceURL(),
+		testEnv2.BuildServiceURL(),
+	}
+	errCh := make(chan error, len(servers))
+
+	// start multiple concurrent builds to different servers
+	for _, serverURL := range servers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			client, err := client.NewBuildServiceClient(
+				client.BuildServiceClientConfig{
+					URL: serverURL,
+				},
+			)
+			if err != nil {
+				errCh <- fmt.Errorf("client setup %w", err)
+				return
+			}
+			artifact, err := client.Build(context.TODO(), platform, k6Constrain, deps)
+			if err != nil {
+				errCh <- fmt.Errorf("building artifact  %v", err)
+			}
+
+			k6BinPath := filepath.Join(t.TempDir(), "k6")
+			err = util.Download(context.TODO(), artifact.URL, k6BinPath)
+			if err != nil {
+				errCh <- fmt.Errorf("downloading artifact  %v", err)
+				return
+			}
+
+			err = exec.CommandContext(context.TODO(), k6BinPath, "version").Run()
+			if err != nil {
+				errCh <- fmt.Errorf("running k6 %v", err)
+				return
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("concurrent builds %v", err)
+	default:
 	}
 }
