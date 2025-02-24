@@ -177,9 +177,13 @@ func (s *Store) Get(ctx context.Context, id string) (store.Object, error) {
 		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
 	}
 
+	checksum, err := base64.StdEncoding.DecodeString(*obj.Checksum.ChecksumSHA256)
+	if err != nil {
+		return store.Object{}, k6build.NewWrappedError(store.ErrAccessingObject, err)
+	}
 	return store.Object{
 		ID:       id,
-		Checksum: *obj.Checksum.ChecksumSHA256,
+		Checksum: fmt.Sprintf("%x", checksum),
 		URL:      url,
 	}, nil
 }
