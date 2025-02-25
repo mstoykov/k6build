@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -54,21 +55,8 @@ func MockFoundryFactory(_ context.Context, opts k6foundry.NativeFoundryOpts) (k6
 	}, nil
 }
 
-const catalogJSON = `
-{
-"k6": {"module": "go.k6.io/k6", "versions": ["v0.1.0", "v0.2.0"]},
-"k6/x/ext": {"module": "go.k6.io/k6ext", "versions": ["v0.1.0", "v0.2.0"]},
-"k6/x/ext2": {"module": "go.k6.io/k6ext2", "versions": ["v0.1.0"]}
-}
-`
-
 // SetupTestBuilder setups a local build service for testing
 func SetupTestBuilder(t *testing.T) (*Builder, error) {
-	catalog, err := catalog.NewCatalogFromJSON(strings.NewReader(catalogJSON))
-	if err != nil {
-		return nil, fmt.Errorf("setting up test builder %w", err)
-	}
-
 	store, err := file.NewFileStore(t.TempDir())
 	if err != nil {
 		return nil, fmt.Errorf("creating temporary object store %w", err)
@@ -76,7 +64,7 @@ func SetupTestBuilder(t *testing.T) (*Builder, error) {
 
 	return New(context.Background(), Config{
 		Opts:    Opts{},
-		Catalog: catalog,
+		Catalog: filepath.Join("testdata", "catalog.json"),
 		Store:   store,
 		Foundry: FoundryFactoryFunction(MockFoundryFactory),
 	})
@@ -453,11 +441,6 @@ func TestMetrics(t *testing.T) {
 
 			register := prometheus.NewPedanticRegistry()
 
-			catalog, err := catalog.NewCatalogFromJSON(strings.NewReader(catalogJSON))
-			if err != nil {
-				t.Fatalf("setting up test builder %v", err)
-			}
-
 			store, err := file.NewFileStore(t.TempDir())
 			if err != nil {
 				t.Fatalf("creating temporary object store %v", err)
@@ -465,7 +448,7 @@ func TestMetrics(t *testing.T) {
 
 			builder, err := New(context.Background(), Config{
 				Opts:       Opts{},
-				Catalog:    catalog,
+				Catalog:    filepath.Join("testdata", "catalog.json"),
 				Store:      store,
 				Foundry:    FoundryFactoryFunction(MockFoundryFactory),
 				Registerer: register,

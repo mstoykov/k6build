@@ -74,7 +74,7 @@ type Opts struct {
 // Config defines the configuration for a Builder
 type Config struct {
 	Opts       Opts
-	Catalog    catalog.Catalog
+	Catalog    string
 	Store      store.ObjectStore
 	Foundry    FoundryFactory
 	Registerer prometheus.Registerer
@@ -83,7 +83,7 @@ type Config struct {
 // Builder implements the BuildService interface
 type Builder struct {
 	opts    Opts
-	catalog catalog.Catalog
+	catalog string
 	store   store.ObjectStore
 	mutexes sync.Map
 	foundry FoundryFactory
@@ -92,7 +92,7 @@ type Builder struct {
 
 // New returns a new instance of Builder given a BuilderConfig
 func New(_ context.Context, config Config) (*Builder, error) {
-	if config.Catalog == nil {
+	if config.Catalog == "" {
 		return nil, k6build.NewWrappedError(ErrInitializingBuilder, errors.New("catalog cannot be nil"))
 	}
 
@@ -212,6 +212,11 @@ func (b *Builder) resolveDependencies(
 	k6Constrains string,
 	deps []k6build.Dependency,
 ) (catalog.Module, map[string]catalog.Module, error) {
+	ctlg, err := catalog.NewCatalog(ctx, b.catalog)
+	if err != nil {
+		return catalog.Module{}, nil, err
+	}
+
 	resolved := map[string]catalog.Module{}
 
 	// check if it is a semver of the form v0.0.0+<build>
@@ -229,14 +234,14 @@ func (b *Builder) resolveDependencies(
 		// use a semantic version for the build metadata
 		k6Mod = catalog.Module{Path: k6Path, Version: "v0.0.0+" + buildMetadata}
 	} else {
-		k6Mod, err = b.catalog.Resolve(ctx, catalog.Dependency{Name: k6DependencyName, Constrains: k6Constrains})
+		k6Mod, err = ctlg.Resolve(ctx, catalog.Dependency{Name: k6DependencyName, Constrains: k6Constrains})
 		if err != nil {
 			return catalog.Module{}, nil, err
 		}
 	}
 
 	for _, d := range deps {
-		m, err := b.catalog.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
+		m, err := ctlg.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
 		if err != nil {
 			return catalog.Module{}, nil, err
 		}

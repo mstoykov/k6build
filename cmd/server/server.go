@@ -100,7 +100,7 @@ func livenessHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 // New creates new cobra command for the server command.
-func New() *cobra.Command { //nolint:funlen,gocognit
+func New() *cobra.Command { //nolint:funlen
 	var (
 		allowBuildSemvers bool
 		catalogURL        string
@@ -142,11 +142,6 @@ func New() *cobra.Command { //nolint:funlen,gocognit
 				),
 			)
 
-			catalog, err := catalog.NewCatalog(cmd.Context(), catalogURL)
-			if err != nil {
-				return fmt.Errorf("creating catalog %w", err)
-			}
-
 			var store store.ObjectStore
 
 			if s3Bucket != "" {
@@ -186,7 +181,7 @@ func New() *cobra.Command { //nolint:funlen,gocognit
 					Verbose:           verbose,
 					AllowBuildSemvers: allowBuildSemvers,
 				},
-				Catalog:    catalog,
+				Catalog:    catalogURL,
 				Store:      store,
 				Registerer: prometheus.DefaultRegisterer,
 			}

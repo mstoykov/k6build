@@ -72,17 +72,13 @@ func NewTestEnv(cfg TestEnvConfig) (*TestEnv, error) {
 	if catalogURL == "" {
 		catalogURL = catalog.DefaultCatalogURL
 	}
-	catalog, err := catalog.NewCatalog(context.TODO(), catalogURL)
-	if err != nil {
-		return nil, fmt.Errorf("build server setup %w", err)
-	}
 	buildConfig := builder.Config{
 		Opts: builder.Opts{
 			GoOpts: builder.GoOpts{
 				CopyGoEnv: true,
 			},
 		},
-		Catalog: catalog,
+		Catalog: catalogURL,
 		Store:   storeClient,
 	}
 	builder, err := builder.New(context.TODO(), buildConfig)
