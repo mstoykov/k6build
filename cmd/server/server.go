@@ -5,15 +5,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/builder"
 	"github.com/grafana/k6build/pkg/catalog"
+	"github.com/grafana/k6build/pkg/httpserver"
 	"github.com/grafana/k6build/pkg/server"
 	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/store/client"
@@ -21,7 +19,6 @@ import (
 	"github.com/grafana/k6build/pkg/util"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/spf13/cobra"
 )
@@ -95,11 +92,6 @@ k6build server --s3-endpoint http://localhost:4566 --store-bucket k6build
 `
 )
 
-// livenessHandler is a simple handler that returns a 200 status code.
-func livenessHandler(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
 type serverConfig struct {
 	allowBuildSemvers bool
 	catalogURL        string
@@ -152,52 +144,20 @@ func New() *cobra.Command { //nolint:funlen
 			}
 			buildAPI := server.NewAPIServer(apiConfig)
 
-			srv := http.NewServeMux()
-			srv.Handle("POST /build", http.StripPrefix("/build", buildAPI))
-
-			// serve metrics
-			srv.Handle("/metrics", promhttp.Handler())
-
-			// add liveness check
-			srv.HandleFunc("/alive", livenessHandler)
-
-			httpServer := &http.Server{
-				Addr:              fmt.Sprintf("0.0.0.0:%d", cfg.port),
-				Handler:           srv,
+			srvConfig := httpserver.ServerConfig{
+				Logger:            log,
+				Port:              cfg.port,
+				EnableMetrics:     true,
+				LivenessProbe:     true,
 				ReadHeaderTimeout: 5 * time.Second,
 			}
 
-			serverErrors := make(chan error, 1)
+			srv := httpserver.NewServer(srvConfig)
+			srv.Handle("/build", buildAPI)
 
-			go func() {
-				log.Info("starting server", "address", httpServer.Addr)
-				err := httpServer.ListenAndServe()
-				if err != nil && err != http.ErrServerClosed {
-					serverErrors <- err
-				}
-			}()
-
-			shutdown := make(chan os.Signal, 1)
-			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
-
-			select {
-			case err := <-serverErrors:
-				return fmt.Errorf("server error: %w", err)
-
-			case sig := <-shutdown:
-				log.Debug("shutdown started", "signal", sig)
-
-				ctx, cancel := context.WithTimeout(cmd.Context(), cfg.shutdownTimeout)
-				defer cancel()
-
-				if err := httpServer.Shutdown(ctx); err != nil {
-					log.Error("graceful shutdown failed", "error", err)
-					if err := httpServer.Close(); err != nil {
-						return fmt.Errorf("could not stop server: %w", err)
-					}
-				}
-
-				log.Debug("shutdown completed")
+			err = srv.Start(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("error serving requests %w", err)
 			}
 
 			return nil
@@ -209,10 +169,14 @@ func New() *cobra.Command { //nolint:funlen
 		"catalog",
 		"c",
 		catalog.DefaultCatalogURL,
-		"dependencies catalog. Can be path to a local file or an URL."+
-			"\n",
+		"dependencies catalog. Can be path to a local file or an URL.",
 	)
-	cmd.Flags().StringVar(&cfg.storeURL, "store-url", "http://localhost:9000", "store server url")
+	cmd.Flags().StringVar(
+		&cfg.storeURL,
+		"store-url",
+		"http://localhost:9000",
+		"store server url",
+	)
 	cmd.Flags().StringVar(&cfg.s3Bucket, "store-bucket", "", "s3 bucket for storing binaries")
 	cmd.Flags().StringVar(&cfg.s3Endpoint, "s3-endpoint", "", "s3 endpoint")
 	cmd.Flags().StringVar(&cfg.s3Region, "s3-region", "", "aws region")

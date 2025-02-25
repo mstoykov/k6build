@@ -2,15 +2,12 @@
 package store
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
+	"github.com/grafana/k6build/pkg/httpserver"
 	"github.com/grafana/k6build/pkg/store/file"
 	"github.com/grafana/k6build/pkg/store/server"
 	"github.com/grafana/k6build/pkg/util"
@@ -69,7 +66,7 @@ func New() *cobra.Command { //nolint:funlen
 		SilenceUsage: true,
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
 		SilenceErrors: true,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// set log
 			ll, err := util.ParseLogLevel(logLevel)
 			if err != nil {
@@ -89,6 +86,7 @@ func New() *cobra.Command { //nolint:funlen
 			if err != nil {
 				return fmt.Errorf("creating object store %w", err)
 			}
+			log.Info("file store", "dir", storeDir)
 
 			config := server.StoreServerConfig{
 				BaseURL: storeSrvURL,
@@ -100,46 +98,19 @@ func New() *cobra.Command { //nolint:funlen
 				return fmt.Errorf("creating store server %w", err)
 			}
 
-			srv := http.NewServeMux()
-			srv.Handle("/store/", storeSrv)
-
-			httpServer := &http.Server{
-				Addr:              fmt.Sprintf("0.0.0.0:%d", port),
-				Handler:           srv,
+			srvConfig := httpserver.ServerConfig{
+				Logger:            log,
+				Port:              port,
+				LivenessProbe:     true,
 				ReadHeaderTimeout: 5 * time.Second,
 			}
 
-			serverErrors := make(chan error, 1)
+			srv := httpserver.NewServer(srvConfig)
+			srv.Handle("/store/", storeSrv)
 
-			go func() {
-				log.Info("starting server", "address", httpServer.Addr, "object store", storeDir)
-				err := httpServer.ListenAndServe()
-				if err != nil && err != http.ErrServerClosed {
-					serverErrors <- err
-				}
-			}()
-
-			shutdown := make(chan os.Signal, 1)
-			signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
-
-			select {
-			case err := <-serverErrors:
-				return fmt.Errorf("server error: %w", err)
-
-			case sig := <-shutdown:
-				log.Debug("shutdown started", "signal", sig)
-
-				ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-				defer cancel()
-
-				if err := httpServer.Shutdown(ctx); err != nil {
-					log.Error("graceful shutdown failed", "error", err)
-					if err := httpServer.Close(); err != nil {
-						return fmt.Errorf("could not stop server: %w", err)
-					}
-				}
-
-				log.Debug("shutdown completed")
+			err = srv.Start(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("error serving requests %w", err)
 			}
 
 			return nil
