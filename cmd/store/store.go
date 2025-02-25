@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/store/file"
 	"github.com/grafana/k6build/pkg/store/server"
+	"github.com/grafana/k6build/pkg/util"
 
 	"github.com/spf13/cobra"
 )
@@ -71,7 +71,7 @@ func New() *cobra.Command { //nolint:funlen
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// set log
-			ll, err := k6build.ParseLogLevel(logLevel)
+			ll, err := util.ParseLogLevel(logLevel)
 			if err != nil {
 				return fmt.Errorf("parsing log level %w", err)
 			}

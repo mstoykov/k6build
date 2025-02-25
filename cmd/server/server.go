@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/k6build/pkg/store"
 	"github.com/grafana/k6build/pkg/store/client"
 	"github.com/grafana/k6build/pkg/store/s3"
+	"github.com/grafana/k6build/pkg/util"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -99,22 +100,26 @@ func livenessHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+type serverConfig struct {
+	allowBuildSemvers bool
+	catalogURL        string
+	copyGoEnv         bool
+	enableCgo         bool
+	goEnv             map[string]string
+	port              int
+	s3Bucket          string
+	s3Endpoint        string
+	s3Region          string
+	storeURL          string
+	verbose           bool
+	shutdownTimeout   time.Duration
+}
+
 // New creates new cobra command for the server command.
 func New() *cobra.Command { //nolint:funlen
 	var (
-		allowBuildSemvers bool
-		catalogURL        string
-		copyGoEnv         bool
-		enableCgo         bool
-		goEnv             map[string]string
-		logLevel          string
-		port              int
-		s3Bucket          string
-		s3Endpoint        string
-		s3Region          string
-		storeURL          string
-		verbose           bool
-		shutdownTimeout   time.Duration
+		cfg      = serverConfig{}
+		logLevel string
 	)
 
 	cmd := &cobra.Command{
@@ -127,67 +132,18 @@ func New() *cobra.Command { //nolint:funlen
 		// this is needed to prevent cobra to print errors reported by subcommands in the stderr
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// set log
-			ll, err := k6build.ParseLogLevel(logLevel)
+			log, err := getLogger(logLevel)
 			if err != nil {
-				return fmt.Errorf("parsing log level %w", err)
+				return err
 			}
 
-			log := slog.New(
-				slog.NewTextHandler(
-					os.Stderr,
-					&slog.HandlerOptions{
-						Level: ll,
-					},
-				),
-			)
-
-			var store store.ObjectStore
-
-			if s3Bucket != "" {
-				store, err = s3.New(s3.Config{
-					Bucket:   s3Bucket,
-					Endpoint: s3Endpoint,
-					Region:   s3Region,
-				})
-				if err != nil {
-					return fmt.Errorf("creating s3 store %w", err)
-				}
-			} else {
-				store, err = client.NewStoreClient(client.StoreClientConfig{
-					Server: storeURL,
-				})
-				if err != nil {
-					return fmt.Errorf("creating store %w", err)
-				}
+			if cfg.enableCgo {
+				log.Warn("CGO is enabled by default. Use --enable-cgo=false to disable it.")
 			}
 
-			// TODO: check this logic
-			if enableCgo {
-				log.Warn("enabling CGO for build service")
-			} else {
-				if goEnv == nil {
-					goEnv = make(map[string]string)
-				}
-				goEnv["CGO_ENABLED"] = "0"
-			}
-
-			config := builder.Config{
-				Opts: builder.Opts{
-					GoOpts: builder.GoOpts{
-						Env:       goEnv,
-						CopyGoEnv: copyGoEnv,
-					},
-					Verbose:           verbose,
-					AllowBuildSemvers: allowBuildSemvers,
-				},
-				Catalog:    catalogURL,
-				Store:      store,
-				Registerer: prometheus.DefaultRegisterer,
-			}
-			buildSrv, err := builder.New(cmd.Context(), config)
+			buildSrv, err := cfg.getBuildService(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("creating local build service  %w", err)
+				return err
 			}
 
 			apiConfig := server.APIServerConfig{
@@ -206,7 +162,7 @@ func New() *cobra.Command { //nolint:funlen
 			srv.HandleFunc("/alive", livenessHandler)
 
 			httpServer := &http.Server{
-				Addr:              fmt.Sprintf("0.0.0.0:%d", port),
+				Addr:              fmt.Sprintf("0.0.0.0:%d", cfg.port),
 				Handler:           srv,
 				ReadHeaderTimeout: 5 * time.Second,
 			}
@@ -231,7 +187,7 @@ func New() *cobra.Command { //nolint:funlen
 			case sig := <-shutdown:
 				log.Debug("shutdown started", "signal", sig)
 
-				ctx, cancel := context.WithTimeout(cmd.Context(), shutdownTimeout)
+				ctx, cancel := context.WithTimeout(cmd.Context(), cfg.shutdownTimeout)
 				defer cancel()
 
 				if err := httpServer.Shutdown(ctx); err != nil {
@@ -249,35 +205,112 @@ func New() *cobra.Command { //nolint:funlen
 	}
 
 	cmd.Flags().StringVarP(
-		&catalogURL,
+		&cfg.catalogURL,
 		"catalog",
 		"c",
 		catalog.DefaultCatalogURL,
 		"dependencies catalog. Can be path to a local file or an URL."+
 			"\n",
 	)
-	cmd.Flags().StringVar(&storeURL, "store-url", "http://localhost:9000", "store server url")
-	cmd.Flags().StringVar(&s3Bucket, "store-bucket", "", "s3 bucket for storing binaries")
-	cmd.Flags().StringVar(&s3Endpoint, "s3-endpoint", "", "s3 endpoint")
-	cmd.Flags().StringVar(&s3Region, "s3-region", "", "aws region")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print build process output")
-	cmd.Flags().BoolVarP(&copyGoEnv, "copy-go-env", "g", true, "copy go environment")
-	cmd.Flags().StringToStringVarP(&goEnv, "env", "e", nil, "build environment variables")
-	cmd.Flags().IntVarP(&port, "port", "p", 8000, "port server will listen")
+	cmd.Flags().StringVar(&cfg.storeURL, "store-url", "http://localhost:9000", "store server url")
+	cmd.Flags().StringVar(&cfg.s3Bucket, "store-bucket", "", "s3 bucket for storing binaries")
+	cmd.Flags().StringVar(&cfg.s3Endpoint, "s3-endpoint", "", "s3 endpoint")
+	cmd.Flags().StringVar(&cfg.s3Region, "s3-region", "", "aws region")
+	cmd.Flags().BoolVarP(&cfg.verbose, "verbose", "v", false, "print build process output")
+	cmd.Flags().BoolVarP(&cfg.copyGoEnv, "copy-go-env", "g", true, "copy go environment")
+	cmd.Flags().StringToStringVarP(&cfg.goEnv, "env", "e", nil, "build environment variables")
+	cmd.Flags().IntVarP(&cfg.port, "port", "p", 8000, "port server will listen")
 	cmd.Flags().StringVarP(&logLevel, "log-level", "l", "INFO", "log level")
-	cmd.Flags().BoolVar(&enableCgo, "enable-cgo", false, "enable CGO for building binaries.")
+	cmd.Flags().BoolVar(&cfg.enableCgo, "enable-cgo", false, "enable CGO for building binaries.")
 	cmd.Flags().BoolVar(
-		&allowBuildSemvers,
+		&cfg.allowBuildSemvers,
 		"allow-build-semvers",
 		false,
 		"allow building versions with build metadata (e.g v0.0.0+build).",
 	)
 	cmd.Flags().DurationVar(
-		&shutdownTimeout,
+		&cfg.shutdownTimeout,
 		"shutdown-timeout",
 		10*time.Second,
 		"maximum time to wait for graceful shutdown",
 	)
 
 	return cmd
+}
+
+func getLogger(logLevel string) (*slog.Logger, error) {
+	ll, err := util.ParseLogLevel(logLevel)
+	if err != nil {
+		return nil, fmt.Errorf("parsing log level %w", err)
+	}
+
+	return slog.New(
+		slog.NewTextHandler(
+			os.Stderr,
+			&slog.HandlerOptions{
+				Level: ll,
+			},
+		),
+	), nil
+}
+
+func (cfg serverConfig) getBuildService(ctx context.Context) (k6build.BuildService, error) {
+	store, err := cfg.getStore() //nolint:contextcheck
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.enableCgo {
+		if cfg.goEnv == nil {
+			cfg.goEnv = make(map[string]string)
+		}
+		cfg.goEnv["CGO_ENABLED"] = ""
+	}
+
+	config := builder.Config{
+		Opts: builder.Opts{
+			GoOpts: builder.GoOpts{
+				Env:       cfg.goEnv,
+				CopyGoEnv: cfg.copyGoEnv,
+			},
+			Verbose:           cfg.verbose,
+			AllowBuildSemvers: cfg.allowBuildSemvers,
+		},
+		Catalog:    cfg.catalogURL,
+		Store:      store,
+		Registerer: prometheus.DefaultRegisterer,
+	}
+	builder, err := builder.New(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("creating local build service  %w", err)
+	}
+
+	return builder, nil
+}
+
+func (cfg serverConfig) getStore() (store.ObjectStore, error) {
+	var (
+		err   error
+		store store.ObjectStore
+	)
+
+	if cfg.s3Bucket != "" {
+		store, err = s3.New(s3.Config{
+			Bucket:   cfg.s3Bucket,
+			Endpoint: cfg.s3Endpoint,
+			Region:   cfg.s3Region,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("creating s3 store %w", err)
+		}
+	} else {
+		store, err = client.NewStoreClient(client.StoreClientConfig{
+			Server: cfg.storeURL,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("creating store %w", err)
+		}
+	}
+
+	return store, nil
 }
