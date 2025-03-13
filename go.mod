@@ -95,4 +95,7 @@ require (
 	golang.org/x/mod v0.23.0 // indirect
 )
 
-retract v0.0.0 // premature publishing
+retract (
+	v0.5.7 // corrupted cache
+	v0.0.0 // premature publishing
+)
