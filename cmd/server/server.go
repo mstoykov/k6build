@@ -224,12 +224,14 @@ func (cfg serverConfig) getBuildService(ctx context.Context) (k6build.BuildServi
 		return nil, err
 	}
 
-	if cfg.enableCgo {
-		if cfg.goEnv == nil {
-			cfg.goEnv = make(map[string]string)
-		}
-		cfg.goEnv["CGO_ENABLED"] = ""
+	if cfg.goEnv == nil {
+		cfg.goEnv = make(map[string]string)
 	}
+	cgoEnabled := "0"
+	if cfg.enableCgo {
+		cgoEnabled = "1"
+	}
+	cfg.goEnv["CGO_ENABLED"] = cgoEnabled
 
 	config := builder.Config{
 		Opts: builder.Opts{
