@@ -8,6 +8,7 @@ import { randomFromArray, randomFromDict } from "./lib/utils.js"
 // kv tore used to coordinate builders and user
 const kv = openKv();
 
+const catalogURL  = __ENV.EXT_CATALOG_URL || 'https://registry.k6.io/product/cloud-catalog.json';
 const buildSrvURL = __ENV.K6_BUILD_SERVICE_URL || 'http://localhost:8000';
 const buildSrvToken = __ENV.K6_BUILD_SERVICE_AUTH || __ENV.K6_CLOUD_TOKEN
 const buildSrvEndpoint = `${buildSrvURL}/build`
@@ -18,20 +19,12 @@ if (buildSrvToken) {
         buildSrvHeaders["Authorization"] = `Bearer ${buildSrvToken}`
 }
 
-// supported k6 versions
-const k6Versions = ["v0.55.0", "v0.56.0", "v0.57.0"]
-
-// supported extensions
-const extensions = {
-        "k6/x/faker": ["v0.4.0"],
-        "k6/x/ssh": ["v0.1.1", "v0.1.0"],
-}
 
 // creates a random build request piking a combination of a k6 version and an extension
-function randomBuildRequest() {
-        const k6Version = randomFromArray(k6Versions)
-        const ext = randomFromDict(extensions)
-        const extVersion = randomFromArray(extensions[ext])
+function randomBuildRequest(catalog) {
+        const k6Version = randomFromArray(catalog.k6)
+        const ext = randomFromDict(catalog.extensions)
+        const extVersion = randomFromArray(catalog.extensions[ext])
 
         return {
                 "k6": k6Version,
@@ -70,15 +63,47 @@ async function cleanupAWS() {
         }
 }
 
+//filter extensions based on a function
+// by default, filter out only k6
+async function filterExtensions(catalog, filter) {
+        if (!filter) {
+                filter = function(entry){ return entry != "k6"}
+        }
+
+        let filtered = {}
+        // collect the name and versions of all non-filtered extensions
+        for (const entry of Object.keys(catalog)) {
+                if (!filter(entry, catalog[entry])){
+                        continue
+                }
+                filtered[entry] = catalog[entry].versions;
+        }
+
+        return filtered
+}
+
 export async function setup() {
         await kv.clear();
 
         await cleanupAWS()
+
+        const resp = await http.get(catalogURL)
+        if (resp.status != 200) {
+                throw new Error(`unable to fetch catalog at ${catalogURL} : ${resp.status_text}`)
+        }
+
+        const catalog = resp.json()
+        const extensions = await filterExtensions(catalog)
+
+        return {
+                "k6": catalog["k6"].versions,
+                "extensions": extensions
+        }
 }
 
 // make a build request
-export async function build() {
-        const request = JSON.stringify(randomBuildRequest())
+export async function build(catalog) {
+        const request = JSON.stringify(randomBuildRequest(catalog))
         const resp = http.post(
                 buildSrvEndpoint,
                 request,
@@ -98,7 +123,7 @@ export async function build() {
 }
 
 // make a request for an already-build artifact
-export async function use() {
+export async function use(catalog) {
         const builds = await kv.list({ prefix: "build:" })
         if (builds.length == 0) {
                 return
