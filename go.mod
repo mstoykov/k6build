@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
 	github.com/aws/smithy-go v1.22.3
 	github.com/docker/go-connections v0.5.0
-	github.com/grafana/k6foundry v0.4.5
+	github.com/grafana/k6foundry v0.4.6
 	github.com/prometheus/client_golang v1.16.0
 	github.com/spf13/cobra v1.9.1
 	github.com/testcontainers/testcontainers-go/modules/localstack v0.35.0
