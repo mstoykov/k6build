@@ -2,8 +2,8 @@
 package main
 
 import (
-	"github.com/grafana/clireadme"
 	"github.com/grafana/k6build/cmd"
+	"github.com/grafana/k6build/internal/clireadme"
 )
 
 func main() {
