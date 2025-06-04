@@ -14,14 +14,10 @@ import (
 	"github.com/grafana/k6build/pkg/api"
 )
 
-type testSrv struct {
-	handlers []requestHandler
-}
-
 // process request and return a boolean indicating if request should be passed to the next handler in the chain
 type requestHandler func(w http.ResponseWriter, r *http.Request) bool
 
-func withValidateRequest() requestHandler {
+func validateBuildRequest() requestHandler {
 	return func(w http.ResponseWriter, r *http.Request) bool {
 		req := api.BuildRequest{}
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -30,8 +26,7 @@ func withValidateRequest() requestHandler {
 			return false
 		}
 
-		if req.K6Constrains == "" || req.Platform == "" || len(req.Dependencies) == 0 {
-			w.WriteHeader(http.StatusBadRequest)
+		if req.Platform == "" || req.K6Constrains == "" || len(req.Dependencies) == 0 {
 			return false
 		}
 
@@ -39,7 +34,24 @@ func withValidateRequest() requestHandler {
 	}
 }
 
-func withAuthorizationCheck(authType string, auth string) requestHandler {
+func validateResolveRequest() requestHandler {
+	return func(w http.ResponseWriter, r *http.Request) bool {
+		req := api.ResolveRequest{}
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return false
+		}
+
+		if req.K6Constrains == "" || len(req.Dependencies) == 0 {
+			return false
+		}
+
+		return true
+	}
+}
+
+func checkAuthorization(authType string, auth string) requestHandler {
 	return func(w http.ResponseWriter, r *http.Request) bool {
 		authHeader := fmt.Sprintf("%s %s", authType, auth)
 		if r.Header.Get("Authorization") != authHeader {
@@ -50,7 +62,7 @@ func withAuthorizationCheck(authType string, auth string) requestHandler {
 	}
 }
 
-func withHeadersCheck(headers map[string]string) requestHandler {
+func checkHeader(headers map[string]string) requestHandler {
 	return func(w http.ResponseWriter, r *http.Request) bool {
 		for h, v := range headers {
 			if r.Header.Get(h) != v {
@@ -62,7 +74,7 @@ func withHeadersCheck(headers map[string]string) requestHandler {
 	}
 }
 
-func withResponse(status int, response api.BuildResponse) requestHandler {
+func response(status int, response any) requestHandler {
 	return func(w http.ResponseWriter, _ *http.Request) bool {
 		resp := &bytes.Buffer{}
 		err := json.NewEncoder(resp).Encode(response)
@@ -77,25 +89,19 @@ func withResponse(status int, response api.BuildResponse) requestHandler {
 	}
 }
 
-func (t testSrv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "application/json")
-
-	// check headers
-	for _, check := range t.handlers {
-		if !check(w, r) {
-			return
+// creates a chain of handlers. Executes them until one returns false
+func handlerChain(handlers ...requestHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+		for _, handler := range handlers {
+			if !handler(w, r) {
+				return
+			}
 		}
 	}
-
-	// by default return ok and an empty artifact
-	resp := &bytes.Buffer{}
-	_ = json.NewEncoder(resp).Encode(api.BuildResponse{Artifact: k6build.Artifact{}}) //nolint:errchkjson
-
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(resp.Bytes())
 }
 
-func TestRemote(t *testing.T) {
+func TestBuild(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -103,45 +109,52 @@ func TestRemote(t *testing.T) {
 		headers   map[string]string
 		auth      string
 		authType  string
-		handlers  []requestHandler
+		handler   http.HandlerFunc
 		expectErr error
 	}{
 		{
 			title: "normal build",
-			handlers: []requestHandler{
-				withValidateRequest(),
-			},
+			handler: handlerChain(
+				validateBuildRequest(),
+				response(http.StatusOK, api.BuildResponse{}),
+			),
 		},
 		{
 			title: "build request failed",
-			handlers: []requestHandler{
-				withResponse(http.StatusOK, api.BuildResponse{Error: k6build.NewWrappedError(api.ErrBuildFailed, nil)}),
-			},
+			handler: handlerChain(
+				validateBuildRequest(),
+				response(http.StatusOK, api.BuildResponse{Error: k6build.NewWrappedError(api.ErrBuildFailed, nil)}),
+			),
 			expectErr: api.ErrBuildFailed,
 		},
 		{
 			title:    "auth header",
 			auth:     "token",
 			authType: "Bearer",
-			handlers: []requestHandler{
-				withAuthorizationCheck("Bearer", "token"),
-			},
+			handler: handlerChain(
+				validateBuildRequest(),
+				checkAuthorization("Bearer", "token"),
+				response(http.StatusOK, api.BuildResponse{}),
+			),
 			expectErr: nil,
 		},
 		{
 			title:    "with default auth type",
 			auth:     "token",
 			authType: "",
-			handlers: []requestHandler{
-				withAuthorizationCheck("Bearer", "token"),
-			},
+			handler: handlerChain(
+				validateBuildRequest(),
+				checkAuthorization("Bearer", "token"),
+				response(http.StatusOK, api.BuildResponse{}),
+			),
 			expectErr: nil,
 		},
 		{
 			title: "failed auth",
-			handlers: []requestHandler{
-				withResponse(http.StatusUnauthorized, api.BuildResponse{Error: k6build.NewWrappedError(api.ErrRequestFailed, errors.New("unauthorized"))}),
-			},
+			handler: handlerChain(
+				validateBuildRequest(),
+				response(http.StatusUnauthorized, api.BuildResponse{Error: k6build.NewWrappedError(api.ErrRequestFailed, errors.New("unauthorized"))}),
+			),
 			expectErr: api.ErrRequestFailed,
 		},
 		{
@@ -149,9 +162,11 @@ func TestRemote(t *testing.T) {
 			headers: map[string]string{
 				"Custom-Header": "Custom-Value",
 			},
-			handlers: []requestHandler{
-				withHeadersCheck(map[string]string{"Custom-Header": "Custom-Value"}),
-			},
+			handler: handlerChain(
+				validateBuildRequest(),
+				checkHeader(map[string]string{"Custom-Header": "Custom-Value"}),
+				response(http.StatusOK, api.BuildResponse{}),
+			),
 			expectErr: nil,
 		},
 	}
@@ -161,9 +176,7 @@ func TestRemote(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			srv := httptest.NewServer(testSrv{
-				handlers: tc.handlers,
-			})
+			srv := httptest.NewServer(tc.handler)
 
 			defer srv.Close()
 
@@ -182,6 +195,68 @@ func TestRemote(t *testing.T) {
 			_, err = client.Build(
 				context.TODO(),
 				"linux/amd64",
+				"v0.1.0",
+				[]k6build.Dependency{{Name: "k6/x/test", Constraints: "*"}},
+			)
+
+			if !errors.Is(err, tc.expectErr) {
+				t.Fatalf("expected %v got %v", tc.expectErr, err)
+			}
+		})
+	}
+}
+
+func TestResolce(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		title     string
+		headers   map[string]string
+		auth      string
+		authType  string
+		handler   http.HandlerFunc
+		expectErr error
+	}{
+		{
+			title: "normal build",
+			handler: handlerChain(
+				validateResolveRequest(),
+				response(http.StatusOK, api.ResolveResponse{}),
+			),
+		},
+		{
+			title: "resolve request failed",
+			handler: handlerChain(
+				validateResolveRequest(),
+				response(http.StatusOK, api.ResolveResponse{Error: k6build.NewWrappedError(api.ErrCannotSatisfy, nil)}),
+			),
+			expectErr: api.ErrCannotSatisfy,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(tc.handler)
+
+			defer srv.Close()
+
+			client, err := NewBuildServiceClient(
+				BuildServiceClientConfig{
+					URL:               srv.URL,
+					Headers:           tc.headers,
+					Authorization:     tc.auth,
+					AuthorizationType: tc.authType,
+				},
+			)
+			if err != nil {
+				t.Fatalf("unexpected %v", err)
+			}
+
+			_, err = client.Resolve(
+				context.TODO(),
 				"v0.1.0",
 				[]k6build.Dependency{{Name: "k6/x/test", Constraints: "*"}},
 			)

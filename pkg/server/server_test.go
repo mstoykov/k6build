@@ -13,40 +13,38 @@ import (
 	"github.com/grafana/k6build/pkg/api"
 )
 
-type buildFunction func(
-	ctx context.Context,
-	platform string,
-	k6Constrains string,
-	deps []k6build.Dependency,
-) (k6build.Artifact, error)
-
-func (f buildFunction) Build(
-	ctx context.Context,
-	platform string,
-	k6Constrains string,
-	deps []k6build.Dependency,
-) (k6build.Artifact, error) {
-	return f(ctx, platform, k6Constrains, deps)
+type mockBuilder struct {
+	err     error
+	patform string
+	deps    map[string]string
 }
 
-func buildOk(
+func (m mockBuilder) Build(
 	ctx context.Context,
 	platform string,
 	k6Constrains string,
 	deps []k6build.Dependency,
 ) (k6build.Artifact, error) {
+	if m.err != nil {
+		return k6build.Artifact{}, m.err
+	}
+
 	return k6build.Artifact{
-		Dependencies: map[string]string{"k6": "v0.1.0"},
+		Platform:     m.patform,
+		Dependencies: m.deps,
 	}, nil
 }
 
-func buildErr(
+func (m mockBuilder) Resolve(
 	ctx context.Context,
-	platform string,
 	k6Constrains string,
 	deps []k6build.Dependency,
-) (k6build.Artifact, error) {
-	return k6build.Artifact{}, k6build.ErrBuildFailed
+) (map[string]string, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	return m.deps, nil
 }
 
 func TestAPIServer(t *testing.T) {
@@ -54,32 +52,37 @@ func TestAPIServer(t *testing.T) {
 
 	testCases := []struct {
 		title    string
-		build    buildFunction
+		build    k6build.BuildService
 		req      []byte
 		status   int
 		err      error
 		artifact k6build.Artifact
 	}{
 		{
-			title:    "build ok",
-			build:    buildFunction(buildOk),
+			title: "build ok",
+			build: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
 			status:   http.StatusOK,
 			artifact: k6build.Artifact{},
 			err:      nil,
 		},
 		{
-			title:    "build error",
-			build:    buildFunction(buildErr),
+			title: "build error",
+			build: mockBuilder{
+				err: k6build.ErrBuildFailed,
+			},
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
 			status:   http.StatusOK,
 			artifact: k6build.Artifact{},
 			err:      api.ErrBuildFailed,
 		},
 		{
-			title:    "invalid request",
-			build:    buildFunction(buildOk),
-			req:      []byte(""),
+			title: "invalid request",
+			build: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			}, req: []byte(""),
 			status:   http.StatusBadRequest,
 			artifact: k6build.Artifact{},
 			err:      api.ErrInvalidRequest,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -70,7 +71,11 @@ func SetupTestBuilder(t *testing.T) (*Builder, error) {
 	})
 }
 
-func TestDependencyResolution(t *testing.T) {
+func platform() string {
+	return fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+}
+
+func TestBuild(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -90,26 +95,10 @@ func TestDependencyResolution(t *testing.T) {
 			},
 		},
 		{
-			title:     "build k6 >v0.1.0",
-			k6:        ">v0.1.0",
-			deps:      []k6build.Dependency{},
-			expectErr: nil,
-			expect: k6build.Artifact{
-				Dependencies: map[string]string{"k6": "v0.2.0"},
-			},
-		},
-		{
-			title:     "build unsatisfied k6 constrain (>v0.2.0)",
-			k6:        ">v0.2.0",
-			deps:      []k6build.Dependency{},
-			expectErr: catalog.ErrCannotSatisfy,
-		},
-		{
-			title:     "build k6 v0.1.0 exact dependency constraint",
+			title:     "build multiple dependencies",
 			k6:        "v0.1.0",
 			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: "v0.1.0"}},
-			expectErr: nil,
-			expect: k6build.Artifact{
+			expectErr: nil, expect: k6build.Artifact{
 				Dependencies: map[string]string{
 					"k6":       "v0.1.0",
 					"k6/x/ext": "v0.1.0",
@@ -117,10 +106,10 @@ func TestDependencyResolution(t *testing.T) {
 			},
 		},
 		{
-			title:     "build k6 v0.1.0 unsatisfied dependency constrain",
-			k6:        "v0.1.0",
-			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: ">v0.2.0"}},
-			expectErr: catalog.ErrCannotSatisfy,
+			title:     "build unsatisfied constrain (>v0.2.0)",
+			k6:        ">v0.2.0",
+			deps:      []k6build.Dependency{},
+			expectErr: ErrInvalidParameters,
 		},
 	}
 
@@ -136,7 +125,7 @@ func TestDependencyResolution(t *testing.T) {
 
 			artifact, err := buildsrv.Build(
 				context.TODO(),
-				"linux/amd64",
+				platform(),
 				tc.k6,
 				tc.deps,
 			)
@@ -150,7 +139,89 @@ func TestDependencyResolution(t *testing.T) {
 				return
 			}
 
+			// compare dependencies
 			diff := cmp.Diff(tc.expect.Dependencies, artifact.Dependencies, cmpopts.SortSlices(DependencyComp))
+			if diff != "" {
+				t.Fatalf("dependencies don't match: %s\n", diff)
+			}
+		})
+	}
+}
+
+func TestResolve(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		title     string
+		k6        string
+		deps      []k6build.Dependency
+		expectErr error
+		expect    map[string]string
+	}{
+		{
+			title:     "resolve exact version k6 v0.1.0 ",
+			k6:        "v0.1.0",
+			deps:      []k6build.Dependency{},
+			expectErr: nil,
+			expect:    map[string]string{"k6": "v0.1.0"},
+		},
+		{
+			title:     "resolve k6 >v0.1.0",
+			k6:        ">v0.1.0",
+			deps:      []k6build.Dependency{},
+			expectErr: nil,
+			expect:    map[string]string{"k6": "v0.2.0"},
+		},
+		{
+			title:     "unsatisfied k6 constrain (>v0.2.0)",
+			k6:        ">v0.2.0",
+			deps:      []k6build.Dependency{},
+			expectErr: ErrResolvingDependencies,
+		},
+		{
+			title:     "resolve multiple dependencies constraint",
+			k6:        "v0.1.0",
+			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: "v0.1.0"}},
+			expectErr: nil,
+			expect: map[string]string{
+				"k6":       "v0.1.0",
+				"k6/x/ext": "v0.1.0",
+			},
+		},
+		{
+			title:     "build k6 v0.1.0 unsatisfied dependency constrain",
+			k6:        "v0.1.0",
+			deps:      []k6build.Dependency{{Name: "k6/x/ext", Constraints: ">v0.2.0"}},
+			expectErr: ErrResolvingDependencies,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			buildsrv, err := SetupTestBuilder(t)
+			if err != nil {
+				t.Fatalf("test setup %v", err)
+			}
+
+			deps, err := buildsrv.Resolve(
+				context.TODO(),
+				tc.k6,
+				tc.deps,
+			)
+
+			if !errors.Is(err, tc.expectErr) {
+				t.Fatalf("unexpected error wanted %v got %v", tc.expectErr, err)
+			}
+
+			// don't check artifact if error is expected
+			if tc.expectErr != nil {
+				return
+			}
+
+			diff := cmp.Diff(tc.expect, deps, cmpopts.SortSlices(DependencyComp))
 			if diff != "" {
 				t.Fatalf("dependencies don't match: %s\n", diff)
 			}
