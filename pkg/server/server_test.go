@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/grafana/k6build"
@@ -56,7 +57,6 @@ func TestAPIServer(t *testing.T) {
 		req      []byte
 		status   int
 		err      error
-		artifact k6build.Artifact
 	}{
 		{
 			title: "build ok",
@@ -65,7 +65,6 @@ func TestAPIServer(t *testing.T) {
 			},
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
 			status:   http.StatusOK,
-			artifact: k6build.Artifact{},
 			err:      nil,
 		},
 		{
@@ -75,16 +74,15 @@ func TestAPIServer(t *testing.T) {
 			},
 			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
 			status:   http.StatusOK,
-			artifact: k6build.Artifact{},
 			err:      api.ErrBuildFailed,
 		},
 		{
 			title: "invalid request",
 			build: mockBuilder{
 				deps: map[string]string{"k6": "v0.1.0"},
-			}, req: []byte(""),
+			},
+			req: []byte(""),
 			status:   http.StatusBadRequest,
-			artifact: k6build.Artifact{},
 			err:      api.ErrInvalidRequest,
 		},
 	}
@@ -102,7 +100,8 @@ func TestAPIServer(t *testing.T) {
 			req := bytes.Buffer{}
 			req.Write(tc.req)
 
-			resp, err := http.Post(apiserver.URL, "application/json", &req)
+			url, _ := url.Parse(apiserver.URL)
+			resp, err := http.Post(url.JoinPath("build").String(), "application/json", &req)
 			if err != nil {
 				t.Fatalf("making request %v", err)
 			}

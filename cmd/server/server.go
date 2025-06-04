@@ -142,7 +142,7 @@ func New() *cobra.Command { //nolint:funlen
 				BuildService: buildSrv,
 				Log:          log,
 			}
-			buildAPI := server.NewAPIServer(apiConfig)
+			buildServer := server.NewAPIServer(apiConfig)
 
 			srvConfig := httpserver.ServerConfig{
 				Logger:            log,
@@ -153,7 +153,7 @@ func New() *cobra.Command { //nolint:funlen
 			}
 
 			srv := httpserver.NewServer(srvConfig)
-			srv.Handle("/build", buildAPI)
+			srv.Handle("/", buildServer)
 
 			err = srv.Start(cmd.Context())
 			if err != nil {
