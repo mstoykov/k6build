@@ -7,82 +7,173 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/api"
 )
 
-type buildFunction func(
-	ctx context.Context,
-	platform string,
-	k6Constrains string,
-	deps []k6build.Dependency,
-) (k6build.Artifact, error)
-
-func (f buildFunction) Build(
-	ctx context.Context,
-	platform string,
-	k6Constrains string,
-	deps []k6build.Dependency,
-) (k6build.Artifact, error) {
-	return f(ctx, platform, k6Constrains, deps)
+type mockBuilder struct {
+	err  error
+	deps map[string]string
 }
 
-func buildOk(
+func (m mockBuilder) Build(
 	ctx context.Context,
 	platform string,
 	k6Constrains string,
 	deps []k6build.Dependency,
 ) (k6build.Artifact, error) {
+	if m.err != nil {
+		return k6build.Artifact{}, m.err
+	}
+
 	return k6build.Artifact{
-		Dependencies: map[string]string{"k6": "v0.1.0"},
+		Platform:     platform,
+		Dependencies: m.deps,
 	}, nil
 }
 
-func buildErr(
+func (m mockBuilder) Resolve(
 	ctx context.Context,
-	platform string,
 	k6Constrains string,
 	deps []k6build.Dependency,
-) (k6build.Artifact, error) {
-	return k6build.Artifact{}, k6build.ErrBuildFailed
+) (map[string]string, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.deps, nil
 }
 
-func TestAPIServer(t *testing.T) {
+// extracts the Error field from the struct s using reflection
+// if the fields does not exist or is not of type error, returns nil
+func extractError(s any) error {
+	errField := reflect.ValueOf(s).Elem().FieldByName("Error")
+	if errField.IsNil() {
+		return nil
+	}
+
+	err, ok := errField.Interface().(error)
+	if !ok {
+		return nil
+	}
+	return err
+}
+
+// TestAPI tests the different endpoints exposed by the APIServer
+// using generic request and response objects
+func TestAPI(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		title    string
-		build    buildFunction
-		req      []byte
-		status   int
-		err      error
-		artifact k6build.Artifact
+		title         string
+		builder       k6build.BuildService
+		path          string
+		req           any // use any to allow passing invalid requests values
+		resp          any // use this field to decode response. Must be a pointer to the expected response type
+		expectReponse any
+		expectStatus  int
+		expectErr     error
 	}{
 		{
-			title:    "build ok",
-			build:    buildFunction(buildOk),
-			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
-			status:   http.StatusOK,
-			artifact: k6build.Artifact{},
-			err:      nil,
+			title: "build request",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path: "build",
+			req:  &api.BuildRequest{Platform: "linux/amd64", K6Constrains: "v0.1.0"},
+			resp: &api.BuildResponse{},
+			expectReponse: &api.BuildResponse{
+				Artifact: k6build.Artifact{
+					Platform:     "linux/amd64",
+					Dependencies: map[string]string{"k6": "v0.1.0"},
+				},
+			},
+			expectStatus: http.StatusOK,
+			expectErr:    nil,
 		},
 		{
-			title:    "build error",
-			build:    buildFunction(buildErr),
-			req:      []byte("{\"Platform\": \"linux/amd64\", \"K6Constrains\": \"v0.1.0\", \"Dependencies\": []}"),
-			status:   http.StatusOK,
-			artifact: k6build.Artifact{},
-			err:      api.ErrBuildFailed,
+			title: "build error",
+			builder: mockBuilder{
+				err: k6build.ErrBuildFailed,
+			},
+			path:         "build",
+			req:          &api.BuildRequest{Platform: "linux/amd64", K6Constrains: "v0.1.0"},
+			resp:         &api.BuildResponse{},
+			expectStatus: http.StatusOK,
+			expectErr:    api.ErrBuildFailed,
 		},
 		{
-			title:    "invalid request",
-			build:    buildFunction(buildOk),
-			req:      []byte(""),
-			status:   http.StatusBadRequest,
-			artifact: k6build.Artifact{},
-			err:      api.ErrInvalidRequest,
+			title: "invalid build request (empty request object)",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path:          "build",
+			req:           "",
+			expectReponse: &api.BuildResponse{},
+			expectStatus:  http.StatusBadRequest,
+			expectErr:     nil,
+		},
+		{
+			title: "invalid build request (wrong struct)",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path:          "build",
+			req:           struct{ Invalid string }{Invalid: "value"},
+			expectReponse: &api.BuildResponse{},
+			expectStatus:  http.StatusBadRequest,
+			expectErr:     nil,
+		},
+		{
+			title: "resolve request",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path: "resolve",
+			req:  &api.ResolveRequest{K6Constrains: "v0.1.0"},
+			resp: &api.ResolveResponse{},
+			expectReponse: &api.ResolveResponse{
+				Dependencies: map[string]string{"k6": "v0.1.0"},
+			},
+			expectStatus: http.StatusOK,
+			expectErr:    nil,
+		},
+		{
+			title: "resolve error",
+			builder: mockBuilder{
+				err: api.ErrCannotSatisfy,
+			},
+			path:         "resolve",
+			req:          &api.ResolveRequest{K6Constrains: "v0.1.0"},
+			resp:         &api.ResolveResponse{},
+			expectStatus: http.StatusOK,
+			expectErr:    api.ErrCannotSatisfy,
+		},
+		{
+			title: "invalid resolve request (empty request object)",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path:         "resolve",
+			req:          "",
+			resp:         &api.ResolveResponse{},
+			expectStatus: http.StatusBadRequest,
+			expectErr:    nil,
+		},
+		{
+			title: "invalid resolve request (wrong struct)",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path:          "resolve",
+			req:           struct{ Invalid string }{Invalid: "value"},
+			expectReponse: &api.ResolveResponse{},
+			expectStatus:  http.StatusBadRequest,
+			expectErr:     nil,
 		},
 	}
 
@@ -92,14 +183,18 @@ func TestAPIServer(t *testing.T) {
 			t.Parallel()
 
 			config := APIServerConfig{
-				BuildService: tc.build,
+				BuildService: tc.builder,
 			}
 			apiserver := httptest.NewServer(NewAPIServer(config))
 
-			req := bytes.Buffer{}
-			req.Write(tc.req)
+			req := &bytes.Buffer{}
+			err := json.NewEncoder(req).Encode(tc.req)
+			if err != nil {
+				t.Fatalf("encoding request %v", err)
+			}
 
-			resp, err := http.Post(apiserver.URL, "application/json", &req)
+			url, _ := url.Parse(apiserver.URL)
+			resp, err := http.Post(url.JoinPath(tc.path).String(), "application/json", req)
 			if err != nil {
 				t.Fatalf("making request %v", err)
 			}
@@ -107,18 +202,34 @@ func TestAPIServer(t *testing.T) {
 				_ = resp.Body.Close()
 			}()
 
-			if resp.StatusCode != tc.status {
-				t.Fatalf("expected status code: %d got %d", tc.status, resp.StatusCode)
+			if resp.StatusCode != tc.expectStatus {
+				t.Fatalf("expected status code: %d got %d", tc.expectStatus, resp.StatusCode)
 			}
 
-			buildResponse := api.BuildResponse{}
-			err = json.NewDecoder(resp.Body).Decode(&buildResponse)
+			// if non 200 response is expected, don't validate response
+			if tc.expectStatus != http.StatusOK {
+				return
+			}
+
+			err = json.NewDecoder(resp.Body).Decode(&tc.resp)
 			if err != nil {
 				t.Fatalf("decoding response %v", err)
 			}
 
-			if tc.err != nil && !errors.Is(buildResponse.Error, tc.err) {
-				t.Fatalf("expected error: %q got %q", tc.err, buildResponse.Error)
+			// check Error in response, if any
+			respErr := extractError(tc.resp)
+			if tc.expectErr != nil && !errors.Is(respErr, tc.expectErr) {
+				t.Fatalf("expected error: %q got %q", tc.expectErr, respErr)
+			}
+
+			// if error is expected, don't validate response
+			if tc.expectErr != nil {
+				return
+			}
+
+			if !cmp.Equal(tc.resp, tc.expectReponse) {
+				t.Fatalf("%s", cmp.Diff(tc.resp, tc.expectReponse))
+				// t.Fatalf("expected %v got %v", tc.expectReponse, tc.resp)
 			}
 		})
 	}

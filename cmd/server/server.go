@@ -32,7 +32,10 @@ API
 
 The server exposes an API for building custom k6 binaries.
 
-The API returns the metadata of the custom binary, including an URL for downloading it,
+Build
+=====
+
+The build endpoint returns the metadata of the custom binary, including an URL for downloading it,
 but does not return the binary itself.
 
 For example
@@ -64,6 +67,32 @@ For example
 
 Note: The build server disables CGO by default but enables it when a dependency requires it.
       use --enable-cgo=true to enable CGO support by default.
+
+Resolve
+=======
+
+The Resolve operation returns the versions that satisfy the given dependency constrains or
+an error if they cannot be satisfied.
+
+For example
+
+	curl http://localhost:8000/resolve -d \
+	'{
+	  "k6":"v0.50.0",
+	  "dependencies":[
+	    {
+		"name":"k6/x/kubernetes",
+		"constraints":">v0.8.0"
+	    }
+	  ],
+	}' | jq .
+
+	{
+	  "dependencies": {
+	    "k6": "v0.50.0",
+	    "k6/x/kubernetes": "v0.10.0"
+	  },
+	}
 
 
 Metrics
@@ -142,7 +171,7 @@ func New() *cobra.Command { //nolint:funlen
 				BuildService: buildSrv,
 				Log:          log,
 			}
-			buildAPI := server.NewAPIServer(apiConfig)
+			buildServer := server.NewAPIServer(apiConfig)
 
 			srvConfig := httpserver.ServerConfig{
 				Logger:            log,
@@ -153,7 +182,7 @@ func New() *cobra.Command { //nolint:funlen
 			}
 
 			srv := httpserver.NewServer(srvConfig)
-			srv.Handle("/build", buildAPI)
+			srv.Handle("/", buildServer)
 
 			err = srv.Start(cmd.Context())
 			if err != nil {

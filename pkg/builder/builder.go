@@ -35,9 +35,10 @@ const (
 var (
 	ErrAccessingArtifact     = errors.New("accessing artifact") //nolint:revive
 	ErrBuildingArtifact      = errors.New("building artifact")
+	ErrBuildSemverNotAllowed = errors.New("semvers with build metadata not allowed")
 	ErrInitializingBuilder   = errors.New("initializing builder")
 	ErrInvalidParameters     = errors.New("invalid build parameters")
-	ErrBuildSemverNotAllowed = errors.New("semvers with build metadata not allowed")
+	ErrResolvingDependencies = errors.New("resolving dependencies")
 
 	constrainRe = regexp.MustCompile(opRe + verRe + buildRe)
 )
@@ -150,12 +151,12 @@ func (b *Builder) Build( //nolint:funlen
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 	}
 
-	k6Mod, resolved, err := b.resolveDependencies(ctx, k6Constrains, deps)
+	resolved, err := b.resolveDependencies(ctx, k6Constrains, deps)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrInvalidParameters, err)
 	}
 
-	id := generateArtifactID(platform, k6Mod, resolved)
+	id := generateArtifactID(platform, resolved)
 
 	unlock := b.lockArtifact(id)
 	defer unlock()
@@ -168,7 +169,7 @@ func (b *Builder) Build( //nolint:funlen
 			ID:           id,
 			Checksum:     artifactObject.Checksum,
 			URL:          artifactObject.URL,
-			Dependencies: resolvedVersions(k6Mod, resolved),
+			Dependencies: resolvedVersions(resolved),
 			Platform:     platform,
 		}, nil
 	}
@@ -181,7 +182,8 @@ func (b *Builder) Build( //nolint:funlen
 	buildTimer := prometheus.NewTimer(b.metrics.buildTimeHistogram)
 
 	artifactBuffer := &bytes.Buffer{}
-	err = b.buildArtifact(ctx, platform, k6Mod.Version, resolved, artifactBuffer)
+
+	err = b.buildArtifact(ctx, platform, resolved, artifactBuffer)
 	if err != nil {
 		return k6build.Artifact{}, k6build.NewWrappedError(ErrBuildingArtifact, err)
 	}
@@ -202,19 +204,33 @@ func (b *Builder) Build( //nolint:funlen
 		ID:           id,
 		Checksum:     artifactObject.Checksum,
 		URL:          artifactObject.URL,
-		Dependencies: resolvedVersions(k6Mod, resolved),
+		Dependencies: resolvedVersions(resolved),
 		Platform:     platform,
 	}, nil
+}
+
+// Resolve returns the version that resolve the given dependencies
+func (b *Builder) Resolve(
+	ctx context.Context,
+	k6Constrains string,
+	deps []k6build.Dependency,
+) (map[string]string, error) {
+	resolved, err := b.resolveDependencies(ctx, k6Constrains, deps)
+	if err != nil {
+		return nil, k6build.NewWrappedError(ErrResolvingDependencies, err)
+	}
+
+	return resolvedVersions(resolved), nil
 }
 
 func (b *Builder) resolveDependencies(
 	ctx context.Context,
 	k6Constrains string,
 	deps []k6build.Dependency,
-) (catalog.Module, map[string]catalog.Module, error) {
+) (map[string]catalog.Module, error) {
 	ctlg, err := catalog.NewCatalog(ctx, b.catalog)
 	if err != nil {
-		return catalog.Module{}, nil, err
+		return nil, err
 	}
 
 	resolved := map[string]catalog.Module{}
@@ -225,30 +241,31 @@ func (b *Builder) resolveDependencies(
 	var k6Mod catalog.Module
 	buildMetadata, err := hasBuildMetadata(k6Constrains)
 	if err != nil {
-		return catalog.Module{}, nil, err
+		return nil, err
 	}
 	if buildMetadata != "" {
 		if !b.opts.AllowBuildSemvers {
-			return catalog.Module{}, nil, ErrBuildSemverNotAllowed
+			return nil, ErrBuildSemverNotAllowed
 		}
 		// use a semantic version for the build metadata
 		k6Mod = catalog.Module{Path: k6Path, Version: "v0.0.0+" + buildMetadata}
 	} else {
 		k6Mod, err = ctlg.Resolve(ctx, catalog.Dependency{Name: k6DependencyName, Constrains: k6Constrains})
 		if err != nil {
-			return catalog.Module{}, nil, err
+			return nil, err
 		}
 	}
+	resolved[k6DependencyName] = k6Mod
 
 	for _, d := range deps {
 		m, err := ctlg.Resolve(ctx, catalog.Dependency{Name: d.Name, Constrains: d.Constraints})
 		if err != nil {
-			return catalog.Module{}, nil, err
+			return nil, err
 		}
 		resolved[d.Name] = m
 	}
 
-	return k6Mod, resolved, nil
+	return resolved, nil
 }
 
 // lockArtifact obtains a mutex used to prevent concurrent builds of the same artifact and
@@ -301,21 +318,27 @@ func hasBuildMetadata(constrain string) (string, error) {
 }
 
 // generateArtifactID generates a unique identifier for a build
-func generateArtifactID(platform string, k6Mod catalog.Module, deps map[string]catalog.Module) string {
+func generateArtifactID(platform string, deps map[string]catalog.Module) string {
 	hashData := bytes.Buffer{}
 	hashData.WriteString(platform)
-	hashData.WriteString(fmt.Sprintf(":%s%s", k6DependencyName, k6Mod.Version))
+
+	// add k6 as the first dependency
+	hashData.WriteString(fmt.Sprintf(":%s%s", k6DependencyName, deps[k6DependencyName].Version))
+
+	// add the other dependencies
 	for _, d := range slices.Sorted(maps.Keys(deps)) {
+		if d == k6DependencyName {
+			continue
+		}
 		hashData.WriteString(fmt.Sprintf(":%s%s", d, deps[d].Version))
 	}
 
 	return fmt.Sprintf("%x", sha1.Sum(hashData.Bytes())) //nolint:gosec
 }
 
-func resolvedVersions(k6Dep catalog.Module, deps map[string]catalog.Module) map[string]string {
+func resolvedVersions(deps map[string]catalog.Module) map[string]string {
 	versions := map[string]string{}
 
-	versions[k6DependencyName] = k6Dep.Version
 	for d, m := range deps {
 		versions[d] = m.Version
 	}
@@ -326,16 +349,20 @@ func resolvedVersions(k6Dep catalog.Module, deps map[string]catalog.Module) map[
 func (b *Builder) buildArtifact(
 	ctx context.Context,
 	platform string,
-	k6Version string,
 	deps map[string]catalog.Module,
 	artifactBuffer io.Writer,
 ) error {
 	// already checked the platform is valid, should be safe to ignore the error
 	buildPlatform, _ := k6foundry.ParsePlatform(platform)
 
+	k6Version := deps[k6DependencyName].Version
+
 	mods := []k6foundry.Module{}
 	cgoEnabled := false
-	for _, m := range deps {
+	for k, m := range deps {
+		if k == k6DependencyName {
+			continue
+		}
 		mods = append(mods, k6foundry.Module{Path: m.Path, Version: m.Version})
 		cgoEnabled = cgoEnabled || m.Cgo
 	}
