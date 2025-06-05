@@ -118,6 +118,17 @@ func TestAPI(t *testing.T) {
 			expectErr:     nil,
 		},
 		{
+			title: "invalid build request (wrong struct)",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path:          "build",
+			req:           struct{ Invalid string }{Invalid: "value"},
+			expectReponse: &api.BuildResponse{},
+			expectStatus:  http.StatusBadRequest,
+			expectErr:     nil,
+		},
+		{
 			title: "resolve request",
 			builder: mockBuilder{
 				deps: map[string]string{"k6": "v0.1.0"},
@@ -152,6 +163,17 @@ func TestAPI(t *testing.T) {
 			resp:         &api.ResolveResponse{},
 			expectStatus: http.StatusBadRequest,
 			expectErr:    nil,
+		},
+		{
+			title: "invalid resolve request (wrong struct)",
+			builder: mockBuilder{
+				deps: map[string]string{"k6": "v0.1.0"},
+			},
+			path:          "resolve",
+			req:           struct{ Invalid string }{Invalid: "value"},
+			expectReponse: &api.ResolveResponse{},
+			expectStatus:  http.StatusBadRequest,
+			expectErr:     nil,
 		},
 	}
 

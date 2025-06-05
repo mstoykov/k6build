@@ -63,7 +63,9 @@ func (a *APIServer) Build(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	req := api.BuildRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = k6build.NewWrappedError(api.ErrInvalidRequest, err)
@@ -107,7 +109,10 @@ func (a *APIServer) Resolve(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	req := api.ResolveRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&req)
+	// err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Error = k6build.NewWrappedError(api.ErrInvalidRequest, err)
