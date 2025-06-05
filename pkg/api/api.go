@@ -88,7 +88,9 @@ func (r ResolveRequest) String() string {
 // String returns a text serialization of the BuildResponse
 func (r ResolveResponse) String() string {
 	buffer := &bytes.Buffer{}
-	buffer.WriteString(fmt.Sprintf("error: %s", r.Error.Error()))
+	if r.Error != nil {
+		buffer.WriteString(fmt.Sprintf("error: %s", r.Error.Error()))
+	}
 	for dep, version := range r.Dependencies {
 		buffer.WriteString(fmt.Sprintf("%s:%q ", dep, version))
 	}
